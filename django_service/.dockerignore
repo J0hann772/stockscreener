@@ -1,17 +1,14 @@
-.idea/
-.venv/
-venv/
-.env
-
-__pycache__/
-*.pyd
-*.pyo
-*.pyc
-
 .git/
 .gitignore
 README.md
 
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+.venv/
 
 .pytest_cache/
 .coverage
@@ -20,12 +17,11 @@ htmlcov/
 logs/
 *.log
 
-
+.idea/
 .vscode/
 
 .env
+.env.example
 keys/private.pem
 
 docs/_build/
-
-
