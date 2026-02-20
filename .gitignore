@@ -17,14 +17,16 @@ README.md
 .coverage
 htmlcov/
 
-logs/
+logs/*
+!logs/.gitkeep
 *.log
 
 
 .vscode/
 
-.env
-keys/private.pem
+
+keys/*
+!keys/.gitkeep
 
 docs/_build/
 
