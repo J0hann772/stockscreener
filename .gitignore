@@ -8,8 +8,7 @@ __pycache__/
 *.pyo
 *.pyc
 
-.git/
-.gitignore
+
 README.md
 
 
@@ -17,16 +16,23 @@ README.md
 .coverage
 htmlcov/
 
-logs/*
-!logs/.gitkeep
-*.log
+fastapi_service/logs/*
+!fastapi_service/logs/.gitkeep
 
+django_service/logs/*
+!django_service/logs/.gitkeep
+
+*.log
+*.sqlite3
 
 .vscode/
 
 
-keys/*
-!keys/.gitkeep
+fastapi_service/keys/*
+!fastapi_service/keys/.gitkeep
+
+django_service/keys/*
+!django_service/keys/.gitkeep
 
 docs/_build/
 

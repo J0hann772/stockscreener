@@ -1,0 +1,52 @@
+services:
+  django:
+    build:
+      context: ./django_service
+      dockerfile: Dockerfile
+
+    env_file: .env.django
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+
+  fastapi:
+    build:
+      context: ./fastapi_service
+      dockerfile: Dockerfile
+    env_file: .env.fastapi
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - internal
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  redis:
+    image: redis:7
+    networks:
+      - internal
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,18 @@
+services:
+  django:
+    build:
+      context: ./django_service
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./django_service:/app
+    ports:
+      - "8000:8000"
+
+  fastapi:
+    build:
+      context: ./fastapi_service
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./fastapi_service:/app
+    ports:
+      - "8001:8001"
