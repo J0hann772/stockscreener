@@ -44,6 +44,10 @@ DB_PASSWORD=db_password
 ```env
 SECRET_KEY=mysecretkey
 DEBUG=True
+
+DB_NAME=my_db
+DB_USER=db_user
+DB_PASSWORD=db_password
 DB_HOST=postgres
 DB_PORT=5432
 ```
@@ -54,7 +58,7 @@ DEBUG=True
 REDIS_URL=redis://redis:6379/0
 ```
 
-> **Почему три файла?** Docker Compose читает `${}` подстановки только из `.env`. Файлы `.env.django` и `.env.fastapi` передаются внутрь контейнеров через директиву `env_file`. Это разные механизмы — DB credentials намеренно вынесены в `.env` чтобы избежать дублирования.
+> **Почему три файла?** Docker Compose читает `${}` подстановки только из `.env`. Файлы `.env.django` и `.env.fastapi` передаются внутрь контейнеров через директиву `env_file`. 
 
 ---
 
