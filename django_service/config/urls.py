@@ -16,8 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import redirect
 
 urlpatterns = [
+    path('', lambda r: redirect('ticker_list')), # Редирект с главной на список тикеров
     path('admin/', admin.site.urls),
     path('auth/', include("apps.users.urls")),
     path('api/tickers/', include("apps.tickers.urls")),

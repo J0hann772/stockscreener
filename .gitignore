@@ -28,7 +28,7 @@ django_service/logs/*
 
 .vscode/
 
-
+keys/
 fastapi_service/keys/*
 !fastapi_service/keys/.gitkeep
 

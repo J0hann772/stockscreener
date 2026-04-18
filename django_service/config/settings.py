@@ -37,9 +37,28 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG").lower() == 'true'
+DEBUG = os.getenv("DEBUG", "True").lower() == 'true'
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "django"]
+
+# JWT Keys configuration (RSA RS256)
+KEYS_DIR = BASE_DIR / 'keys'
+try:
+    with open(KEYS_DIR / 'private.pem', 'rb') as f:
+        JWT_PRIVATE_KEY = f.read()
+    with open(KEYS_DIR / 'public.pem', 'rb') as f:
+        JWT_PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    print("WARNING: RSA keys not found in 'keys/' directory. Run 'python generate_keys.py'.")
+    JWT_PRIVATE_KEY = b""
+    JWT_PUBLIC_KEY = b""
+
+JWT_TTL_MINUTES = 60 * 24 # 1 day
+
+# Ключ для общения между Django и FastAPI
+INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'default-internal-key-for-dev')
+
+LOGIN_URL = 'login'
 
 
 # Application definition
@@ -73,7 +92,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'], # Указываем папку для общих шаблонов (например, base.html)
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
