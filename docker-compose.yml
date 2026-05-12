@@ -1,29 +1,69 @@
 services:
+  init_keys:
+    image: python:3.12-slim
+    working_dir: /project
+    environment:
+      - JWT_KEYS_DIR=/app/keys
+    command: >
+      sh -c "pip install cryptography && python generate_keys.py"
+    volumes:
+      - .:/project
+      - jwt_keys:/app/keys
+
   django:
     build:
       context: ./django_service
       dockerfile: Dockerfile
-
-    env_file: .env.django
+    env_file: .env
+    ports:
+      - "8000:8000"
     depends_on:
+      init_keys:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     networks:
       - internal
+    volumes:
+      - jwt_keys:/app/keys
   fastapi:
     build:
       context: ./fastapi_service
       dockerfile: Dockerfile
-    env_file: .env.fastapi
+    env_file: .env
+    ports:
+      - "8001:8001"
     depends_on:
+      init_keys:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     networks:
       - internal
+    volumes:
+      - jwt_keys:/app/keys
+
+  celery_worker:
+    build:
+      context: ./fastapi_service
+      dockerfile: Dockerfile
+    command: celery -A worker.celery_app worker --loglevel=info -c 4
+    env_file: .env
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      init_keys:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - internal
+    volumes:
+      - jwt_keys:/app/keys
 
   postgres:
     image: postgres:15
@@ -58,3 +98,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  jwt_keys:

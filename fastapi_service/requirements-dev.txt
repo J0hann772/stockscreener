@@ -1,9 +1,7 @@
 -r requirements.txt
 
-pytest
-pytest-django
-pytest-asyncio
 coverage
+httpx
 pylint
 flake8
 sphinx

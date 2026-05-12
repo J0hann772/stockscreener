@@ -12,5 +12,6 @@ from . import views
 urlpatterns = [
     path('', views.strategy_list, name='strategy_list'),
     path('new/', views.strategy_create, name='strategy_create'),
+    path('edit/<int:pk>/', views.strategy_edit, name='strategy_edit'),
     path('delete/<int:pk>/', views.strategy_delete, name='strategy_delete'),
 ]

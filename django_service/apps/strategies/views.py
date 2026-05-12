@@ -1,83 +1,151 @@
 """
-Представления (views) для работы со стратегиями.
+Представления для работы со стратегиями.
 
-Содержит views для просмотра списка стратегий, создания новой
-стратегии с условиями и удаления стратегии. Все views требуют авторизации.
+AJAX-based: создание и редактирование стратегий
+происходит через JSON API, без Django FormSet.
 """
-from django.shortcuts import render, redirect, get_object_or_404
+import json
+
 from django.contrib.auth.decorators import login_required
-from .models import Strategy
-from .forms import StrategyForm, StrategyConditionFormSet
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
+
+from .models import Strategy, StrategyCondition
 
 
 @login_required
 def strategy_list(request):
     """
-    Показывает список стратегий текущего пользователя.
+    Показывает список стратегий пользователя.
 
     Args:
-        request (HttpRequest): объект запроса Django.
+        request (HttpRequest): объект запроса.
 
     Returns:
         HttpResponse: страница со списком стратегий.
     """
-    strategies = Strategy.objects.filter(user=request.user)
+    strategies = Strategy.objects.filter(user=request.user).prefetch_related('conditions')
     return render(request, 'strategies/list.html', {'strategies': strategies})
 
 
 @login_required
 def strategy_create(request):
     """
-    Создаёт новую стратегию с условиями.
+    Страница создания новой стратегии.
 
-    GET-запрос — показывает пустую форму стратегии и formset условий.
-    POST-запрос — сохраняет стратегию и её условия в базу данных.
+    GET — пустая форма конструктора.
+    POST — AJAX: сохраняет стратегию и все условия из JSON.
 
     Args:
-        request (HttpRequest): объект запроса Django.
+        request (HttpRequest): объект запроса.
 
     Returns:
-        HttpResponse: редирект на список стратегий при успехе,
-            либо страница с формой создания.
+        HttpResponse/JsonResponse: страница или JSON с результатом.
     """
     if request.method == 'POST':
-        form = StrategyForm(request.POST)
-        if form.is_valid():
-            strategy = form.save(commit=False)
-            strategy.user = request.user
-            formset = StrategyConditionFormSet(request.POST, instance=strategy)
-            
-            if formset.is_valid():
-                strategy.save()
-                formset.save()
-                return redirect('strategy_list')
-    else:
-        form = StrategyForm()
-        formset = StrategyConditionFormSet()
-        
-    return render(request, 'strategies/form.html', {
-        'form': form,
-        'formset': formset,
-        'title': 'Создать стратегию'
-    })
+        return _save_strategy(request, strategy=None)
+    return render(request, 'strategies/form.html', {'strategy': None, 'is_edit': False})
 
 
 @login_required
-def strategy_delete(request, pk):
+def strategy_edit(request, pk):
     """
-    Удаляет стратегию по её ID.
+    Страница редактирования существующей стратегии.
 
-    Удалить можно только свою стратегию. Удаление происходит
-    только по POST-запросу.
+    GET — форма с заполненными данными.
+    POST — AJAX: обновляет стратегию и пересоздаёт условия.
 
     Args:
-        request (HttpRequest): объект запроса Django.
-        pk (int): ID стратегии для удаления.
+        request (HttpRequest): объект запроса.
+        pk (int): ID стратегии.
+
+    Returns:
+        HttpResponse/JsonResponse: страница или JSON с результатом.
+    """
+    strategy = get_object_or_404(Strategy, pk=pk, user=request.user)
+    if request.method == 'POST':
+        return _save_strategy(request, strategy=strategy)
+
+    conditions_data = list(strategy.conditions.values(
+        'id', 'name', 'indicator', 'params', 'operator', 'value',
+        'is_required', 'group_id', 'compare_to_indicator', 'compare_to_params'
+    ))
+    return render(request, 'strategies/form.html', {
+        'strategy': strategy,
+        'conditions_json': json.dumps(conditions_data),
+        'is_edit': True,
+    })
+
+
+def _save_strategy(request, strategy):
+    """
+    Внутренняя функция сохранения стратегии из AJAX POST.
+
+    Читает JSON из тела запроса, создаёт/обновляет Strategy
+    и пересоздаёт все StrategyCondition.
+
+    Args:
+        request (HttpRequest): объект запроса с JSON в теле.
+        strategy (Strategy | None): существующая стратегия или None для создания.
+
+    Returns:
+        JsonResponse: {'success': True, 'redirect': url} или {'success': False, 'error': msg}.
+    """
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Некорректный JSON'}, status=400)
+
+    name = data.get('name', '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'Название стратегии обязательно'}, status=400)
+
+    if strategy is None:
+        strategy = Strategy(user=request.user)
+
+    strategy.name = name
+    strategy.description = data.get('description', '')
+    strategy.is_active = data.get('is_active', True)
+    strategy.save()
+
+    # Пересоздаём все условия
+    strategy.conditions.all().delete()
+
+    conditions = data.get('conditions', [])
+    for cond in conditions:
+        indicator = cond.get('indicator', '').strip().lower()
+        if not indicator:
+            continue
+        StrategyCondition.objects.create(
+            strategy=strategy,
+            name=cond.get('name', ''),
+            indicator=indicator,
+            params=cond.get('params') or {},
+            operator=cond.get('operator', '>'),
+            value=cond.get('value'),
+            is_required=cond.get('is_required', True),
+            group_id=cond.get('group_id'),
+            compare_to_indicator=cond.get('compare_to_indicator') or None,
+            compare_to_params=cond.get('compare_to_params') or None,
+        )
+
+    return JsonResponse({'success': True, 'redirect': '/strategies/'})
+
+
+@login_required
+@require_POST
+def strategy_delete(request, pk):
+    """
+    Удаляет стратегию пользователя.
+
+    Args:
+        request (HttpRequest): POST-запрос.
+        pk (int): ID стратегии.
 
     Returns:
         HttpResponse: редирект на список стратегий.
     """
     strategy = get_object_or_404(Strategy, pk=pk, user=request.user)
-    if request.method == 'POST':
-        strategy.delete()
+    strategy.delete()
     return redirect('strategy_list')

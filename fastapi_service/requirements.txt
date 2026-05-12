@@ -7,3 +7,4 @@ pandas>=2.2
 pandas-ta>=0.3.14b
 redis>=5.0
 python-dotenv>=1.0
+celery>=5.3
