@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+
+{% block extra_css %}
+<style>
+  .auth-card { max-width: 420px; margin: 2rem auto; }
+  .server-errors {
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.25);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #dc2626;
+  }
+  .field-hint { font-size: 0.78rem; color: var(--bs-secondary-color); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5 auth-card">
+    <div class="form-card p-4">
+      <h3 class="text-center mb-4">Вход в систему</h3>
+
+      {% if form.errors %}
+      <div class="server-errors">
+        {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+        {% endfor %}
+        {% for field in form %}
+          {% for error in field.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" id="loginForm" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="id_username" class="form-label fw-semibold">Имя пользователя</label>
+          <input type="text" name="username" id="id_username" class="form-control"
+                 value="{{ form.username.value|default:'' }}" required autocomplete="username">
+          <div class="field-hint" id="usernameHint" style="display:none;color:#dc2626;"></div>
+        </div>
+
+        <div class="mb-4">
+          <label for="id_password" class="form-label fw-semibold">Пароль</label>
+          <input type="password" name="password" id="id_password" class="form-control"
+                 required autocomplete="current-password">
+          <div class="field-hint" id="passwordHint" style="display:none;color:#dc2626;"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary-custom w-100">Войти</button>
+      </form>
+
+      <div class="text-center mt-3" style="font-size:0.875rem;">
+        Нет аккаунта? <a href="{% url 'register' %}">Регистрация</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Клиентская валидация перед отправкой
+document.getElementById('loginForm').addEventListener('submit', function (e) {
+  let ok = true;
+
+  const username = document.getElementById('id_username').value.trim();
+  const uHint = document.getElementById('usernameHint');
+  if (!username) {
+    uHint.textContent = 'Введите имя пользователя';
+    uHint.style.display = 'block';
+    ok = false;
+  } else {
+    uHint.style.display = 'none';
+  }
+
+  const password = document.getElementById('id_password').value;
+  const pHint = document.getElementById('passwordHint');
+  if (!password) {
+    pHint.textContent = 'Введите пароль';
+    pHint.style.display = 'block';
+    ok = false;
+  } else {
+    pHint.style.display = 'none';
+  }
+
+  if (!ok) e.preventDefault();
+});
+</script>
+{% endblock %}

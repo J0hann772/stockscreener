@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Главная | MarketView{% endblock %}
+{% block content %}
+<div class="row align-items-center mb-5">
+    <div class="col-lg-6">
+        <h1 class="display-5 fw-bold line-height-sm mb-3">Анализируйте рынок <br>с помощью технических индикаторов <span class="text-danger">автоматически</span></h1>
+        <p class="lead text-muted">Создавайте стратегии, добавляйте акции и находите точки входа за секунды.</p>
+        {% if not user.is_authenticated %}
+        <a href="{% url 'register' %}" class="btn btn-primary-custom btn-lg mt-3">Создать аккаунт</a>
+        {% else %}
+        <a href="{% url 'howto' %}" class="btn btn-primary-custom btn-lg mt-3">Как начать</a>
+        {% endif %}
+    </div>
+    <div class="col-lg-6">
+        <div class="card-dashboard p-4 shadow-sm border-0" style="background: linear-gradient(145deg, var(--bs-tertiary-bg), var(--bs-body-bg)); border-radius: 24px;">
+            <div class="row text-center align-items-center py-4">
+                <div class="col-12 mb-4 pb-3 border-bottom border-secondary-subtle">
+                    <div class="stat-title mb-2 fs-6 opacity-75">Доступная биржа</div>
+                    <div class="stat-value display-6 fw-bold">NASDAQ</div>
+                </div>
+                <div class="col-12 pt-2">
+                    <div class="stat-title mb-2 fs-6 opacity-75">Технических индикаторов</div>
+                    <div class="stat-value display-6 fw-bold">Более 10</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

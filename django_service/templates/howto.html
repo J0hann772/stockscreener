@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Как начать | MarketView{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ─── Hero ─── */
+  .howto-hero {
+    text-align: center;
+    padding: 3.5rem 0 2.5rem;
+  }
+  .howto-hero .badge-label {
+    display: inline-block;
+    background: rgba(14,165,233,0.1);
+    color: #0ea5e9;
+    border: 1px solid rgba(14,165,233,0.25);
+    border-radius: 40px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    margin-bottom: 1rem;
+  }
+  .howto-hero h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.75rem;
+  }
+  .howto-hero p {
+    color: var(--bs-secondary-color);
+    max-width: 520px;
+    margin: 0 auto 2rem;
+    font-size: 1.05rem;
+  }
+
+  /* ─── Steps nav pills ─── */
+  .steps-nav {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+  }
+  .step-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.45rem 1rem;
+    border-radius: 40px;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .step-pill:hover, .step-pill.active {
+    border-color: #0ea5e9;
+    color: #0ea5e9;
+    background: rgba(14,165,233,0.06);
+    text-decoration: none;
+  }
+  .step-pill .pill-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bs-tertiary-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+  .step-pill.active .pill-num {
+    background: #0ea5e9;
+    color: #fff;
+  }
+
+  /* ─── Step cards ─── */
+  .step-block {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 24px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2rem;
+    background: var(--bs-body-bg);
+    transition: box-shadow 0.2s;
+    scroll-margin-top: 90px;
+  }
+  .step-block:hover {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+  }
+  .step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .step-icon-wrap {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+  }
+  .icon-blue  { background: rgba(14,165,233,0.12); color: #0ea5e9; }
+  .icon-green { background: rgba(34,197,94,0.12);  color: #22c55e; }
+  .icon-purple{ background: rgba(139,92,246,0.12); color: #8b5cf6; }
+  .step-title-wrap {
+    flex: 1;
+  }
+  .step-number {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 2px;
+  }
+  .step-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  /* ─── Sub-steps ─── */
+  .sub-steps { list-style: none; padding: 0; margin: 0; }
+  .sub-step {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    align-items: flex-start;
+  }
+  .sub-step:last-child { margin-bottom: 0; }
+  .sub-step-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+  .sub-step-body { flex: 1; }
+  .sub-step-body strong { display: block; margin-bottom: 2px; font-size: 0.95rem; }
+  .sub-step-body p {
+    color: var(--bs-secondary-color);
+    font-size: 0.875rem;
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  /* ─── Tip box ─── */
+  .tip-box {
+    background: rgba(14,165,233,0.06);
+    border: 1px solid rgba(14,165,233,0.2);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--bs-body-color);
+    margin-top: 1.25rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .tip-box .tip-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+  /* ─── Indicator chips ─── */
+  .indicator-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .ind-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 10px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .ind-chip .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-trend     { background: #0ea5e9; }
+  .dot-osc       { background: #8b5cf6; }
+  .dot-vol-ind   { background: #f59e0b; }
+  .dot-volume    { background: #22c55e; }
+
+  /* ─── CTA ─── */
+  .cta-section {
+    text-align: center;
+    padding: 2.5rem 1rem 1rem;
+    margin-bottom: 2rem;
+  }
+  .cta-section h3 { font-weight: 700; margin-bottom: 0.5rem; }
+  .cta-section p { color: var(--bs-secondary-color); margin-bottom: 1.5rem; font-size: 0.95rem; }
+  .cta-actions { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+
+  @media (max-width: 576px) {
+    .step-block { padding: 1.5rem 1.25rem; }
+    .howto-hero h1 { font-size: 1.8rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="howto-hero">
+  <div class="badge-label">📖 Руководство</div>
+  <h1>Как начать работу</h1>
+  <p>Три простых шага, чтобы запустить свой первый скринер акций на основе технических индикаторов</p>
+</div>
+
+<!-- Nav pills -->
+<div class="steps-nav" id="stepsNav">
+  <a href="#step-strategy" class="step-pill" data-step="0">
+    <span class="pill-num">1</span> Создать стратегию
+  </a>
+  <a href="#step-ticker" class="step-pill" data-step="1">
+    <span class="pill-num">2</span> Добавить тикер
+  </a>
+  <a href="#step-analysis" class="step-pill" data-step="2">
+    <span class="pill-num">3</span> Запустить анализ
+  </a>
+</div>
+
+<!-- ════ ШАГ 1: СТРАТЕГИЯ ════ -->
+<div class="step-block" id="step-strategy">
+  <div class="step-header">
+    <div class="step-icon-wrap icon-blue">
+      <i class="bi bi-diagram-3-fill"></i>
+    </div>
+    <div class="step-title-wrap">
+      <div class="step-number">Шаг 1 из 3</div>
+      <h2 class="step-title">Создайте торговую стратегию</h2>
+    </div>
+  </div>
+
+  <ul class="sub-steps">
+    <li class="sub-step">
+      <div class="sub-step-num">1</div>
+      <div class="sub-step-body">
+        <strong>Откройте раздел «Стратегии»</strong>
+        <p>В верхнем меню нажмите <b>Стратегии</b> и затем кнопку <b>Создать стратегию</b>.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">2</div>
+      <div class="sub-step-body">
+        <strong>Задайте название и описание</strong>
+        <p>Введите понятное название, например: <em>«RSI Перепроданность + EMA Кросс»</em>. Описание — необязательно.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">3</div>
+      <div class="sub-step-body">
+        <strong>Добавьте обязательные условия (AND)</strong>
+        <p>Нажмите <b>«+ Добавить условие»</b> в блоке <em>Обязательные условия</em>. Все эти условия должны выполниться одновременно, чтобы акция прошла скринер.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">4</div>
+      <div class="sub-step-body">
+        <strong>Выберите индикатор, оператор и значение</strong>
+        <p>Например: <em>RSI &lt; 30</em> означает «RSI ниже 30 — акция перепродана». Настройте период индикатора при необходимости.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">5</div>
+      <div class="sub-step-body">
+        <strong>(Опционально) Добавьте OR-группы</strong>
+        <p>Нажмите <b>«Добавить OR-группу»</b>, чтобы задать альтернативные условия — хотя бы одно из них должно выполниться (OR-логика).</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">6</div>
+      <div class="sub-step-body">
+        <strong>Сохраните стратегию</strong>
+        <p>Нажмите <b>«Сохранить стратегию»</b>. Стратегия сохранится и появится в вашем списке.</p>
+      </div>
+    </li>
+  </ul>
+
+  <div class="tip-box">
+    <span class="tip-icon">💡</span>
+    <div>
+      <strong>Доступные индикаторы:</strong>
+      <div class="indicator-chips mt-2">
+        <span class="ind-chip"><span class="dot dot-trend"></span>EMA</span>
+        <span class="ind-chip"><span class="dot dot-trend"></span>SMA</span>
+        <span class="ind-chip"><span class="dot dot-trend"></span>MACD</span>
+        <span class="ind-chip"><span class="dot dot-trend"></span>ADX</span>
+        <span class="ind-chip"><span class="dot dot-osc"></span>RSI</span>
+        <span class="ind-chip"><span class="dot dot-osc"></span>Stochastic</span>
+        <span class="ind-chip"><span class="dot dot-osc"></span>CCI</span>
+        <span class="ind-chip"><span class="dot dot-vol-ind"></span>Bollinger Bands</span>
+        <span class="ind-chip"><span class="dot dot-vol-ind"></span>ATR</span>
+        <span class="ind-chip"><span class="dot dot-volume"></span>OBV</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'strategy_create' %}" class="btn btn-primary-custom">
+      <i class="bi bi-plus-lg me-1"></i>Создать стратегию
+    </a>
+  </div>
+</div>
+
+<!-- ════ ШАГ 2: ТИКЕР ════ -->
+<div class="step-block" id="step-ticker">
+  <div class="step-header">
+    <div class="step-icon-wrap icon-green">
+      <i class="bi bi-bookmark-plus-fill"></i>
+    </div>
+    <div class="step-title-wrap">
+      <div class="step-number">Шаг 2 из 3</div>
+      <h2 class="step-title">Добавьте акции в список</h2>
+    </div>
+  </div>
+
+  <ul class="sub-steps">
+    <li class="sub-step">
+      <div class="sub-step-num">1</div>
+      <div class="sub-step-body">
+        <strong>Откройте раздел «Акции»</strong>
+        <p>В навигации нажмите <b>Акции</b>. Откроется страница поиска акций по тикеру.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">2</div>
+      <div class="sub-step-body">
+        <strong>Найдите нужную акцию</strong>
+        <p>Введите тикер в поле поиска (например <code>AAPL</code>, <code>TSLA</code>, <code>NVDA</code>) и нажмите <b>Найти</b>.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">3</div>
+      <div class="sub-step-body">
+        <strong>Откройте страницу акции</strong>
+        <p>Нажмите <b>«Открыть страницу акции»</b>, чтобы увидеть подробную информацию: цену, P/E, дивиденды, сектор и график.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">4</div>
+      <div class="sub-step-body">
+        <strong>Добавьте в «Мои тикеры»</strong>
+        <p>На странице акции нажмите кнопку <b>«Добавить в список»</b>. Акция сохранится в разделе <b>Мои тикеры</b> и станет доступна для скрининга.</p>
+      </div>
+    </li>
+  </ul>
+
+  <div class="tip-box">
+    <span class="tip-icon">💡</span>
+    <div>Чем больше тикеров в вашем списке, тем шире охват скринера. Рекомендуем добавить 10–50 акций для полноценного анализа. Тикеры удаляются в разделе <b>Мои тикеры</b>.</div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'stocks_search' %}" class="btn btn-primary-custom">
+      <i class="bi bi-search me-1"></i>Найти акцию
+    </a>
+    <a href="{% url 'ticker_list' %}" class="btn btn-outline-custom ms-2">
+      <i class="bi bi-list-ul me-1"></i>Мои тикеры
+    </a>
+  </div>
+</div>
+
+<!-- ════ ШАГ 3: АНАЛИЗ ════ -->
+<div class="step-block" id="step-analysis">
+  <div class="step-header">
+    <div class="step-icon-wrap icon-purple">
+      <i class="bi bi-graph-up-arrow"></i>
+    </div>
+    <div class="step-title-wrap">
+      <div class="step-number">Шаг 3 из 3</div>
+      <h2 class="step-title">Запустите анализ и смотрите результаты</h2>
+    </div>
+  </div>
+
+  <ul class="sub-steps">
+    <li class="sub-step">
+      <div class="sub-step-num">1</div>
+      <div class="sub-step-body">
+        <strong>Перейдите в раздел «Анализ»</strong>
+        <p>В навигации нажмите <b>Анализ</b>. Здесь вы запускаете скрининг своего портфеля тикеров.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">2</div>
+      <div class="sub-step-body">
+        <strong>Выберите стратегию и таймфрейм</strong>
+        <p>В выпадающем списке выберите нужную стратегию. Затем выберите таймфрейм (5м, 1ч, 1д и т.д.) для расчёта индикаторов.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">3</div>
+      <div class="sub-step-body">
+        <strong>Нажмите «Запустить»</strong>
+        <p>Система проверит каждую акцию из вашего списка по условиям стратегии. Анализ занимает несколько секунд.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">4</div>
+      <div class="sub-step-body">
+        <strong>Изучите результаты</strong>
+        <p>Вы увидите список акций, которые <em>прошли</em> все условия стратегии. Нажмите на тикер, чтобы открыть подробный отчёт по каждому индикатору.</p>
+      </div>
+    </li>
+    <li class="sub-step">
+      <div class="sub-step-num">5</div>
+      <div class="sub-step-body">
+        <strong>Посмотрите графики прошедших акций</strong>
+        <p>Перейдите в <b>Графики</b> — там автоматически появятся свечные графики всех акций, прошедших скринер.</p>
+      </div>
+    </li>
+  </ul>
+
+  <div class="tip-box">
+    <span class="tip-icon">💡</span>
+    <div>История запусков сохраняется. Вы можете вернуться к предыдущим результатам в разделе «Анализ» и сравнить итоги разных стратегий.</div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'analysis_run' %}" class="btn btn-primary-custom">
+      <i class="bi bi-play-fill me-1"></i>Запустить анализ
+    </a>
+    <a href="{% url 'analysis_charts' %}" class="btn btn-outline-custom ms-2">
+      <i class="bi bi-bar-chart-line me-1"></i>Графики
+    </a>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h3>Всё готово — попробуйте прямо сейчас 🚀</h3>
+  <p>Создайте первую стратегию, добавьте несколько акций и запустите скрининг</p>
+  <div class="cta-actions">
+    {% if user.is_authenticated %}
+    <a href="{% url 'strategy_create' %}" class="btn btn-primary-custom px-4">
+      <i class="bi bi-plus-lg me-1"></i>Создать стратегию
+    </a>
+    <a href="{% url 'stocks_search' %}" class="btn btn-outline-custom px-4">
+      <i class="bi bi-search me-1"></i>Найти акцию
+    </a>
+    {% else %}
+    <a href="{% url 'register' %}" class="btn btn-primary-custom px-4">
+      <i class="bi bi-person-plus me-1"></i>Зарегистрироваться
+    </a>
+    <a href="{% url 'login' %}" class="btn btn-outline-custom px-4">
+      Войти
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const pills = document.querySelectorAll('.step-pill');
+  const sections = ['step-strategy', 'step-ticker', 'step-analysis'].map(id => document.getElementById(id));
+
+  function updateActivePill() {
+    let current = -1;
+    sections.forEach((sec, i) => {
+      if (sec && window.scrollY + 140 >= sec.offsetTop) current = i;
+    });
+    pills.forEach((p, i) => p.classList.toggle('active', i === current));
+  }
+
+  // Клик — временно ставим active, потом скролл разберётся
+  pills.forEach((pill, i) => {
+    pill.addEventListener('click', () => {
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+  });
+
+  window.addEventListener('scroll', updateActivePill, { passive: true });
+  // При загрузке — не выделяем ничего
+</script>
+{% endblock %}

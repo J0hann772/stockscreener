@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Анализ{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Segmented tabs ── */
+  .analysis-tabs {
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 12px;
+    display: inline-flex;
+    gap: 2px;
+  }
+  .analysis-tabs .nav-item { margin: 0; }
+  .analysis-tabs .nav-link {
+    color: #64748b;
+    border-radius: 8px;
+    padding: 6px 18px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    transition: all 0.18s;
+    font-size: 0.9rem;
+  }
+  .analysis-tabs .nav-link.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  [data-bs-theme="dark"] .analysis-tabs { background: #1e293b; }
+  [data-bs-theme="dark"] .analysis-tabs .nav-link { color: #94a3b8; }
+  [data-bs-theme="dark"] .analysis-tabs .nav-link.active { background: #0f172a; color: #f8fafc; }
+
+  /* ── Панель запуска ── */
+  .launch-panel {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .launch-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .launch-row select {
+    flex: 1;
+    min-width: 0;
+  }
+  .launch-row .btn-primary-custom {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Карточки результатов ── */
+  .ticker-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 14px;
+    margin-bottom: 0.6rem;
+    overflow: hidden;
+    transition: box-shadow 0.15s;
+  }
+  .ticker-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+  .ticker-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 1rem;
+  }
+  .ticker-card-header .ticker-name {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+  .ticker-card-header .cond-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .cond-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cond-dot.ok { background: #22c55e; }
+  .cond-dot.fail { background: #ef4444; }
+  .cond-dot.err { background: #f59e0b; }
+
+  .ticker-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+  .ticker-badge.ok { background: rgba(34,197,94,0.12); color: #16a34a; }
+  .ticker-badge.fail { background: rgba(239,68,68,0.1); color: #dc2626; }
+
+  .ticker-card-detail {
+    border-top: 1px solid var(--bs-border-color);
+    padding: 1rem 1.25rem;
+    display: none;
+  }
+  .ticker-card-detail.open { display: block; }
+
+  /* ── Таблица условий ── */
+  .cond-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .cond-table th {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--bs-secondary-color);
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+  .cond-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--bs-border-color);
+    vertical-align: middle;
+  }
+  .cond-table tr:last-child td { border-bottom: none; }
+  .cond-table tr.row-ok { background: rgba(34,197,94,0.04); }
+  .cond-table tr.row-fail { background: rgba(239,68,68,0.04); }
+
+  .cond-check { font-size: 0.85rem; font-weight: 700; }
+  .cond-check.ok { color: #22c55e; }
+  .cond-check.fail { color: #ef4444; }
+  .cond-check.err { color: #f59e0b; }
+
+  .group-label-or {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6366f1;
+    padding: 8px 8px 2px;
+  }
+  .group-label-must {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #0ea5e9;
+    padding: 8px 8px 2px;
+  }
+
+  /* ── Matched tickers ── */
+  .ticker-pill {
+    display: inline-block;
+    background: rgba(16,185,129,0.1);
+    color: #059669;
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin: 2px;
+  }
+
+  /* ── История ── */
+  .history-item {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 0.6rem;
+    transition: box-shadow 0.15s;
+  }
+  .history-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.05); }
+  .history-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .history-detail {
+    border-top: 1px solid var(--bs-border-color);
+    padding: 1rem 1.25rem;
+    display: none;
+  }
+  .history-detail.open { display: block; }
+  .run-stat { font-size: 0.8rem; color: var(--bs-secondary-color); }
+  .run-stat strong { color: var(--bs-body-color); }
+
+  /* ── Spinner overlay ── */
+  #spinner-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1055;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #spinner-overlay.active { display: flex; }
+  #spinner-overlay .spinner-text { color: #fff; font-weight: 500; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div id="spinner-overlay">
+  <div class="spinner-border text-light" style="width:3rem;height:3rem;"></div>
+  <div class="spinner-text" id="spinnerText">Анализируем тикеры…</div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h3 class="mb-0">Анализ рынка</h3>
+</div>
+
+<!-- Вкладки -->
+<ul class="nav analysis-tabs mb-4" id="analysisTabs">
+  <li class="nav-item">
+    <button class="nav-link active" onclick="switchTab('run', this)">
+      <i class="bi bi-play-circle me-1"></i>Запустить
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link position-relative" onclick="switchTab('history', this)">
+      <i class="bi bi-clock-history me-1"></i>История
+      {% if history %}
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary"
+            style="font-size:0.6rem;">{{ history|length }}</span>
+      {% endif %}
+    </button>
+  </li>
+</ul>
+
+<!-- ════ ЗАПУСТИТЬ ════════════════════════════════════════════════════════════ -->
+<div id="tab-run">
+
+  {% if not strategies %}
+  <div class="launch-panel text-center py-4">
+    <i class="bi bi-exclamation-circle text-warning fs-3 mb-2 d-block"></i>
+    <div class="fw-semibold">Нет активных стратегий</div>
+    <div class="text-muted mt-1 mb-3" style="font-size:.875rem;">Создайте стратегию, чтобы запустить анализ</div>
+    <a href="{% url 'strategy_create' %}" class="btn btn-primary-custom btn-sm">Создать стратегию</a>
+  </div>
+  {% else %}
+
+  <div class="launch-panel">
+    <div class="launch-row">
+      <select id="strategySelect" class="form-select">
+        {% for s in strategies %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <button id="runBtn" class="btn btn-primary-custom" onclick="runAnalysis()">
+        <i class="bi bi-play-fill me-1"></i>Запустить анализ
+      </button>
+    </div>
+    <div id="runError" class="text-danger mt-2 d-none" style="font-size:.875rem;"></div>
+  </div>
+
+  <!-- Результаты -->
+  <div id="resultsBlock" style="display:none;">
+    <!-- Шапка -->
+    <div class="d-flex align-items-baseline gap-2 mb-3">
+      <span class="fw-semibold fs-6" id="resStratName"></span>
+      <span class="text-muted" style="font-size:.85rem;" id="resStats"></span>
+    </div>
+
+    <!-- Прошедшие тикеры -->
+    <div id="matchedSection" style="display:none;" class="launch-panel mb-3">
+      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#059669;margin-bottom:.5rem;">
+        ✓ Прошли стратегию
+      </div>
+      <div id="matchedTickers"></div>
+    </div>
+
+    <!-- Список тикеров (expandable) -->
+    <div id="tickerCards"></div>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- ════ ИСТОРИЯ ═════════════════════════════════════════════════════════════ -->
+<div id="tab-history" style="display:none;">
+
+  {% if history %}
+  <div class="d-flex justify-content-end mb-3">
+    <button class="btn btn-outline-custom btn-sm text-danger" onclick="clearHistory()">
+      <i class="bi bi-trash me-1"></i>Очистить историю
+    </button>
+  </div>
+  <div id="historyList">
+    {% for run in history %}
+    <div class="history-item" id="run-{{ run.id }}">
+      <div class="history-header" onclick="toggleHistory('h-{{ run.id }}')">
+        <div style="flex:1;min-width:0;">
+          <div class="fw-semibold text-truncate">{{ run.strategy_name }}</div>
+          <div class="run-stat mt-1">
+            <span>{{ run.created_at|date:"d.m.Y H:i" }}</span>
+            &nbsp;·&nbsp;Тикеров: <strong>{{ run.tickers_analyzed }}</strong>
+            &nbsp;·&nbsp;Прошло: <strong class="{% if run.tickers_matched %}text-success{% else %}text-danger{% endif %}">{{ run.tickers_matched }}</strong>
+          </div>
+          {% if run.matched_tickers %}
+          <div class="mt-2">
+            {% for t in run.matched_tickers %}<span class="ticker-pill">{{ t }}</span>{% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted mt-1" style="font-size:.8rem;">Нет совпадений</div>
+          {% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          <i class="bi bi-chevron-down text-muted" id="chevron-h-{{ run.id }}"></i>
+          {% if run.matched_tickers %}
+          <a href="{% url 'analysis_charts' %}?tickers={{ run.matched_tickers|join:',' }}"
+             class="btn btn-sm btn-outline-custom" style="border-radius:8px;" title="Открыть на графике"
+             onclick="event.stopPropagation()">
+            <i class="bi bi-graph-up"></i>
+          </a>
+          {% endif %}
+          <button class="btn btn-sm btn-outline-danger" style="border-radius:8px;"
+                  onclick="event.stopPropagation(); deleteRun({{ run.id }})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      <!-- Детали -->
+      <div class="history-detail" id="h-{{ run.id }}">
+        {% if run.details %}
+          {% for d in run.details %}
+          {% with ticker=d.ticker matched=d.matched conditions=d.conditions %}
+          <div class="mb-3">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="fw-bold">{{ ticker }}</span>
+              {% if matched %}
+              <span class="ticker-badge ok">✓ Прошёл</span>
+              {% else %}
+              <span class="ticker-badge fail">✗ Не прошёл</span>
+              {% endif %}
+            </div>
+            {% if conditions %}
+            <table class="cond-table">
+              <thead><tr>
+                <th></th><th>Условие</th><th>Значение</th><th>Порог</th><th>Оператор</th>
+              </tr></thead>
+              <tbody>
+              {% for c in conditions %}
+              <tr class="{% if c.passed %}row-ok{% else %}row-fail{% endif %}">
+                <td><span class="cond-check {% if c.error %}err{% elif c.passed %}ok{% else %}fail{% endif %}">
+                  {% if c.error %}⚠{% elif c.passed %}✓{% else %}✗{% endif %}
+                </span></td>
+                <td>
+                  <span class="fw-semibold">{{ c.label }}</span>
+                  <span class="text-muted" style="font-size:.75rem;"> ({{ c.group_type|upper }})</span>
+                </td>
+                <td>{% if c.value is not None %}{{ c.value }}{% else %}—{% endif %}</td>
+                <td>{% if c.threshold is not None %}{{ c.threshold }}{% elif c.compare_to %}vs {{ c.compare_to }}{% else %}—{% endif %}</td>
+                <td class="text-muted">{{ c.operator }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+            {% if d.error %}<div class="text-warning mt-1" style="font-size:.78rem;">⚠ {{ d.error }}</div>{% endif %}
+          </div>
+          {% endwith %}
+          {% endfor %}
+        {% else %}
+          <div class="text-muted" style="font-size:.875rem;">Нет детальных данных</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="launch-panel text-center py-5" id="historyEmpty">
+    <i class="bi bi-clock-history text-muted fs-2 mb-2 d-block"></i>
+    <div class="text-muted">История анализов пуста</div>
+    <div class="text-muted mt-1" style="font-size:.8rem;">Результаты запусков сохраняются здесь</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+// ── Вкладки ──────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  ['run','history'].forEach(t =>
+    document.getElementById('tab-'+t).style.display = t===name ? '' : 'none'
+  );
+  document.querySelectorAll('#analysisTabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Запуск ───────────────────────────────────────────────────────────────────
+function runAnalysis() {
+  const strategyId = document.getElementById('strategySelect')?.value;
+  if (!strategyId) return;
+
+  const errEl = document.getElementById('runError');
+  errEl.classList.add('d-none');
+  document.getElementById('resultsBlock').style.display = 'none';
+  document.getElementById('spinnerText').textContent = 'Ставим задачу в очередь…';
+  document.getElementById('spinner-overlay').classList.add('active');
+
+  fetch('{% url "analysis_api_run" %}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ strategy_id: parseInt(strategyId) }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) {
+      document.getElementById('spinner-overlay').classList.remove('active');
+      errEl.textContent = data.error || 'Ошибка';
+      errEl.classList.remove('d-none');
+      return;
+    }
+    document.getElementById('spinnerText').textContent = 'Анализируем тикеры…';
+    pollTaskStatus(data.task_id, data.strategy_id);
+  })
+  .catch(() => {
+    document.getElementById('spinner-overlay').classList.remove('active');
+    errEl.textContent = 'Ошибка соединения';
+    errEl.classList.remove('d-none');
+  });
+}
+
+function pollTaskStatus(taskId, strategyId) {
+  const errEl = document.getElementById('runError');
+  fetch('{% url "analysis_api_status" %}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ task_id: taskId, strategy_id: strategyId }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) {
+      document.getElementById('spinner-overlay').classList.remove('active');
+      errEl.textContent = data.error || 'Ошибка поллинга';
+      errEl.classList.remove('d-none');
+      return;
+    }
+    if (data.status === 'pending') {
+      setTimeout(() => pollTaskStatus(taskId, strategyId), 2000);
+    } else if (data.status === 'completed') {
+      document.getElementById('spinner-overlay').classList.remove('active');
+      renderResults(data);
+    }
+  })
+  .catch(() => {
+    document.getElementById('spinner-overlay').classList.remove('active');
+    errEl.textContent = 'Ошибка соединения при ожидании';
+    errEl.classList.remove('d-none');
+  });
+}
+
+// ── Рендер результатов ───────────────────────────────────────────────────────
+function renderResults(data) {
+  document.getElementById('resStratName').textContent = data.strategy_name;
+  document.getElementById('resStats').textContent =
+    `· Проверено: ${data.tickers_analyzed} · Прошло: ${data.tickers_matched}`;
+
+  // Прошедшие
+  const matchedEl = document.getElementById('matchedTickers');
+  const matchedSection = document.getElementById('matchedSection');
+  if (data.matched && data.matched.length > 0) {
+    matchedEl.innerHTML = data.matched.map(t => `<span class="ticker-pill">${t}</span>`).join('');
+    matchedSection.style.display = '';
+  } else {
+    matchedSection.style.display = 'none';
+  }
+
+  // Карточки тикеров
+  const cards = document.getElementById('tickerCards');
+  cards.innerHTML = '';
+  (data.details || []).forEach((d, i) => {
+    const ok = d.matched;
+    const uid = `tc-${i}`;
+    const dotsHtml = (d.conditions || []).map(c =>
+      `<span class="cond-dot ${c.error ? 'err' : (c.passed ? 'ok' : 'fail')}" title="${c.label}: ${c.value ?? '—'}"></span>`
+    ).join('');
+
+    const condRows = (d.conditions || []).map(c => {
+      const rowClass = c.error ? '' : (c.passed ? 'row-ok' : 'row-fail');
+      const check = c.error ? '<span class="cond-check err">⚠</span>'
+                  : c.passed ? '<span class="cond-check ok">✓</span>'
+                  : '<span class="cond-check fail">✗</span>';
+      const groupTag = c.group_type === 'must'
+        ? `<span style="font-size:.68rem;font-weight:700;color:#0ea5e9;letter-spacing:.05em;">MUST</span>`
+        : `<span style="font-size:.68rem;font-weight:700;color:#6366f1;letter-spacing:.05em;">OR#${c.group_id}</span>`;
+      const threshold = c.compare_to ? `vs ${c.compare_to}` : (c.threshold != null ? c.threshold : '—');
+      return `<tr class="${rowClass}">
+        <td>${check}</td>
+        <td><span class="fw-semibold">${c.label}</span> ${groupTag}${c.error ? `<br><span style="font-size:.72rem;color:#f59e0b;">${c.error}</span>` : ''}</td>
+        <td>${c.value != null ? c.value : '—'}</td>
+        <td>${threshold}</td>
+        <td class="text-muted">${c.operator}</td>
+      </tr>`;
+    }).join('');
+
+    cards.insertAdjacentHTML('beforeend', `
+      <div class="ticker-card">
+        <div class="ticker-card-header" onclick="toggleCard('${uid}', this)">
+          <span class="ticker-name">${d.ticker}</span>
+          <div class="cond-summary">${dotsHtml}</div>
+          <span class="ticker-badge ${ok ? 'ok' : 'fail'}">${ok ? '✓ Прошёл' : '✗ Не прошёл'}</span>
+          <i class="bi bi-chevron-down text-muted" style="transition:transform .2s;"></i>
+        </div>
+        <div class="ticker-card-detail" id="${uid}">
+          ${condRows ? `<table class="cond-table">
+            <thead><tr><th></th><th>Условие</th><th>Значение</th><th>Порог</th><th>Оператор</th></tr></thead>
+            <tbody>${condRows}</tbody>
+          </table>` : '<div class="text-muted" style="font-size:.875rem;">Нет данных</div>'}
+          ${d.error ? `<div class="text-warning mt-2" style="font-size:.78rem;">⚠ ${d.error}</div>` : ''}
+        </div>
+      </div>`);
+  });
+
+  document.getElementById('resultsBlock').style.display = '';
+}
+
+function toggleCard(uid, header) {
+  const detail = document.getElementById(uid);
+  const chevron = header.querySelector('.bi-chevron-down');
+  detail.classList.toggle('open');
+  if (chevron) chevron.style.transform = detail.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function toggleHistory(uid) {
+  const detail = document.getElementById(uid);
+  const chevron = document.getElementById('chevron-' + uid);
+  detail.classList.toggle('open');
+  if (chevron) chevron.style.transform = detail.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+// ── История ──────────────────────────────────────────────────────────────────
+function clearHistory() {
+  if (!confirm('Очистить всю историю анализов?')) return;
+  fetch('{% url "analysis_clear_history" %}', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF },
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      document.getElementById('historyList')?.remove();
+      const tab = document.getElementById('tab-history');
+      if (!document.getElementById('historyEmpty')) {
+        tab.insertAdjacentHTML('beforeend', `
+          <div class="launch-panel text-center py-5" id="historyEmpty">
+            <i class="bi bi-clock-history text-muted fs-2 mb-2 d-block"></i>
+            <div class="text-muted">История анализов пуста</div>
+          </div>`);
+      }
+    }
+  });
+}
+
+function deleteRun(id) {
+  fetch(`/analysis/history/${id}/delete/`, {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF },
+  })
+  .then(r => r.json())
+  .then(d => { if (d.success) document.getElementById('run-'+id)?.remove(); });
+}
+  // Проверка автозапуска при переходе с другой страницы
+  window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const strategyId = params.get('strategy');
+    if (strategyId) {
+      const select = document.getElementById('strategySelect');
+      if (select && [...select.options].some(o => o.value === strategyId)) {
+        select.value = strategyId;
+        // Убираем параметр из URL, чтобы обновление страницы не запускало анализ повторно
+        const cleanUrl = window.location.pathname;
+        history.replaceState(null, '', cleanUrl);
+        runAnalysis();
+      }
+    }
+  });
+</script>
+{% endblock %}

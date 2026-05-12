@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Регистрация{% endblock %}
+
+{% block extra_css %}
+<style>
+  .auth-card { max-width: 420px; margin: 2rem auto; }
+  .field-hint  { font-size: 0.78rem; color: var(--bs-secondary-color); margin-top: 4px; }
+  .field-error { font-size: 0.78rem; color: #dc2626; margin-top: 4px; }
+  #pwStrengthBar  { height: 3px; border-radius: 2px; margin-top: 6px; background: var(--bs-border-color); display: none; }
+  #pwStrengthFill { height: 100%; border-radius: 2px; width: 0; transition: width 0.3s, background 0.3s; }
+  #pwStrengthLabel { display: none; }
+  .server-errors { background: rgba(220,38,38,0.07); border: 1px solid rgba(220,38,38,0.25);
+    border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; color: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5 auth-card">
+    <div class="form-card p-4">
+      <h3 class="text-center mb-4">Регистрация</h3>
+
+      {% if form.errors %}
+      <div class="server-errors">
+        {% for field in form %}
+          {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+        {% endfor %}
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" id="registerForm" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="id_username" class="form-label fw-semibold">Имя пользователя</label>
+          <input type="text" name="username" id="id_username" class="form-control"
+                 value="{{ form.username.value|default:'' }}" required minlength="3">
+          <div class="field-hint">От 3 до 150 символов. Только буквы, цифры и @/./+/-/_</div>
+          <div class="field-error" id="usernameErr"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="id_email" class="form-label fw-semibold">Email</label>
+          <input type="email" name="email" id="id_email" class="form-control"
+                 value="{{ form.email.value|default:'' }}" required>
+          <div class="field-error" id="emailErr"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="id_password1" class="form-label fw-semibold">Пароль</label>
+          <input type="password" name="password1" id="id_password1" class="form-control" required>
+          <div id="pwStrengthBar"><div id="pwStrengthFill"></div></div>
+          <div class="field-hint" id="pwStrengthLabel"></div>
+          <div class="field-hint">Минимум 8 символов. Не используйте простые пароли.</div>
+        </div>
+
+        <div class="mb-4">
+          <label for="id_password2" class="form-label fw-semibold">Подтверждение пароля</label>
+          <input type="password" name="password2" id="id_password2" class="form-control" required>
+          <div class="field-hint" id="pwMatchHint" style="display:none;"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary-custom w-100">Зарегистрироваться</button>
+      </form>
+
+      <div class="text-center mt-3" style="font-size:0.875rem;">
+        Уже есть аккаунт? <a href="{% url 'login' %}">Войдите</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Индикатор силы пароля ──────────────────────────────
+document.getElementById('id_password1').addEventListener('input', function () {
+  const v = this.value;
+  const bar = document.getElementById('pwStrengthBar');
+  const fill = document.getElementById('pwStrengthFill');
+  const label = document.getElementById('pwStrengthLabel');
+  if (!v) { bar.style.display = 'none'; label.style.display = 'none'; return; }
+  bar.style.display = 'block'; label.style.display = 'block';
+  let score = 0;
+  if (v.length >= 8)  score++;
+  if (v.length >= 12) score++;
+  if (/[A-Z]/.test(v)) score++;
+  if (/[0-9]/.test(v)) score++;
+  if (/[^A-Za-z0-9]/.test(v)) score++;
+  const levels = [
+    { pct: '20%', color: '#ef4444', text: 'Очень слабый' },
+    { pct: '40%', color: '#f97316', text: 'Слабый' },
+    { pct: '60%', color: '#eab308', text: 'Средний' },
+    { pct: '80%', color: '#22c55e', text: 'Надёжный' },
+    { pct: '100%', color: '#16a34a', text: 'Очень надёжный' },
+  ];
+  const lvl = levels[Math.min(score, 4)];
+  fill.style.width = lvl.pct;
+  fill.style.background = lvl.color;
+  label.textContent = lvl.text;
+  label.style.color = lvl.color;
+});
+
+// ── Совпадение паролей ─────────────────────────────────
+document.getElementById('id_password2').addEventListener('input', function () {
+  const p1 = document.getElementById('id_password1').value;
+  const hint = document.getElementById('pwMatchHint');
+  hint.style.display = 'block';
+  if (!this.value) { hint.style.display = 'none'; return; }
+  if (this.value === p1) {
+    hint.textContent = '✓ Пароли совпадают';
+    hint.style.color = '#16a34a';
+  } else {
+    hint.textContent = '✗ Пароли не совпадают';
+    hint.style.color = '#ef4444';
+  }
+});
+
+// ── Клиентская валидация перед отправкой ──────────────
+document.getElementById('registerForm').addEventListener('submit', function (e) {
+  let ok = true;
+
+  const username = document.getElementById('id_username').value.trim();
+  const uErr = document.getElementById('usernameErr');
+  if (username.length < 3) {
+    uErr.textContent = 'Имя должно быть не менее 3 символов';
+    ok = false;
+  } else {
+    uErr.textContent = '';
+  }
+
+  const email = document.getElementById('id_email').value.trim();
+  const eErr = document.getElementById('emailErr');
+  if (!email.includes('@')) {
+    eErr.textContent = 'Введите корректный email';
+    ok = false;
+  } else {
+    eErr.textContent = '';
+  }
+
+  const p1 = document.getElementById('id_password1').value;
+  const p2 = document.getElementById('id_password2').value;
+  const hint = document.getElementById('pwMatchHint');
+  if (p1 !== p2) {
+    hint.textContent = '✗ Пароли не совпадают';
+    hint.style.color = '#ef4444';
+    hint.style.display = 'block';
+    ok = false;
+  }
+  if (p1.length < 8) {
+    hint.textContent = 'Пароль должен быть не менее 8 символов';
+    hint.style.color = '#ef4444';
+    hint.style.display = 'block';
+    ok = false;
+  }
+
+  if (!ok) e.preventDefault();
+});
+</script>
+{% endblock %}

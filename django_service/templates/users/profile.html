@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Мой профиль{% endblock %}
+
+{% block extra_css %}
+<style>
+  .profile-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.25rem;
+  }
+  .profile-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 1rem;
+  }
+  .profile-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .profile-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .profile-meta-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+  }
+  .profile-meta-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .field-hint  { font-size: 0.78rem; color: var(--bs-secondary-color); margin-top: 4px; }
+  .field-msg   { font-size: 0.78rem; margin-top: 5px; display: none; }
+  .field-msg.error   { color: #dc2626; }
+  .field-msg.success { color: #16a34a; }
+  #pwStrengthBar  { height: 3px; border-radius: 2px; margin-top: 6px;
+                    background: var(--bs-border-color); display: none; }
+  #pwStrengthFill { height: 100%; border-radius: 2px; width: 0;
+                    transition: width 0.3s, background 0.3s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+
+    <!-- Информация об аккаунте -->
+    <div class="profile-card">
+      <div class="profile-section-title">Аккаунт</div>
+      <div class="profile-meta">
+        <div class="profile-meta-item">
+          <span class="profile-meta-label">Имя пользователя</span>
+          <span class="profile-meta-value" id="displayUsername">{{ request.user.username }}</span>
+        </div>
+        <div class="profile-meta-item">
+          <span class="profile-meta-label">Email</span>
+          <span class="profile-meta-value" id="displayEmail">{{ request.user.email|default:"—" }}</span>
+        </div>
+        <div class="profile-meta-item">
+          <span class="profile-meta-label">Дата регистрации</span>
+          <span class="profile-meta-value">{{ request.user.date_joined|date:"d.m.Y" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Смена никнейма -->
+    <div class="profile-card">
+      <div class="profile-section-title">Имя пользователя</div>
+      <form id="usernameForm">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="newUsername">Новое имя пользователя</label>
+          <input type="text" id="newUsername" class="form-control"
+                 placeholder="{{ request.user.username }}"
+                 minlength="3" maxlength="150" autocomplete="off">
+          <div class="field-hint">От 3 до 150 символов</div>
+          <div class="field-msg" id="usernameMsg"></div>
+        </div>
+        <button type="submit" class="btn btn-primary-custom">Сохранить</button>
+      </form>
+    </div>
+
+    <!-- Смена email -->
+    <div class="profile-card">
+      <div class="profile-section-title">Email</div>
+      <form id="emailForm">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="newEmail">Новый email</label>
+          <input type="email" id="newEmail" class="form-control"
+                 placeholder="{{ request.user.email|default:'example@email.com' }}"
+                 autocomplete="off">
+          <div class="field-msg" id="emailMsg"></div>
+        </div>
+        <button type="submit" class="btn btn-primary-custom">Сохранить</button>
+      </form>
+    </div>
+
+    <!-- Смена пароля -->
+    <div class="profile-card">
+      <div class="profile-section-title">Смена пароля</div>
+      <form id="passwordForm">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="oldPassword">Текущий пароль</label>
+          <input type="password" id="oldPassword" name="old_password" class="form-control" autocomplete="current-password">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="newPassword1">Новый пароль</label>
+          <input type="password" id="newPassword1" name="new_password1" class="form-control" autocomplete="new-password">
+          <div id="pwStrengthBar"><div id="pwStrengthFill"></div></div>
+          <div class="field-hint" id="pwStrengthLabel" style="display:none;"></div>
+          <div class="field-hint">Минимум 8 символов</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="newPassword2">Подтверждение нового пароля</label>
+          <input type="password" id="newPassword2" name="new_password2" class="form-control" autocomplete="new-password">
+          <div class="field-msg" id="pwMatchMsg"></div>
+        </div>
+        <div class="field-msg" id="passwordMsg"></div>
+        <button type="submit" class="btn btn-primary-custom mt-1">Сменить пароль</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+// Универсальная функция показа сообщения
+function msg(id, text, isError) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'field-msg ' + (isError ? 'error' : 'success');
+  el.style.display = text ? 'block' : 'none';
+}
+
+// Автоматически скрыть сообщение через N мс
+function msgAuto(id, text, isError, delay = 3000) {
+  msg(id, text, isError);
+  if (!isError) setTimeout(() => msg(id, '', false), delay);
+}
+
+// ── Смена никнейма ──────────────────────────────────────────
+document.getElementById('usernameForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const val = document.getElementById('newUsername').value.trim();
+  if (!val) { msg('usernameMsg', 'Введите новое имя', true); return; }
+
+  const r = await fetch('{% url "change_username" %}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ username: val })
+  });
+  const d = await r.json();
+  if (d.success) {
+    msgAuto('usernameMsg', 'Имя изменено', false);
+    document.getElementById('displayUsername').textContent = val;
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newUsername').placeholder = val;
+  } else {
+    msg('usernameMsg', d.message || 'Ошибка', true);
+  }
+});
+
+// ── Смена email ──────────────────────────────────────────────
+document.getElementById('emailForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const val = document.getElementById('newEmail').value.trim();
+  if (!val) { msg('emailMsg', 'Введите email', true); return; }
+
+  const fd = new FormData();
+  fd.append('email', val);
+  fd.append('update_profile', '1');
+  const r = await fetch('{% url "update_profile" %}', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd
+  });
+  const d = await r.json();
+  if (d.success) {
+    msgAuto('emailMsg', 'Email изменён', false);
+    document.getElementById('displayEmail').textContent = val;
+    document.getElementById('newEmail').value = '';
+    document.getElementById('newEmail').placeholder = val;
+  } else {
+    msg('emailMsg', d.errors?.email || d.message || 'Ошибка', true);
+  }
+});
+
+// ── Индикатор силы пароля ────────────────────────────────────
+document.getElementById('newPassword1').addEventListener('input', function() {
+  const v = this.value;
+  const bar = document.getElementById('pwStrengthBar');
+  const fill = document.getElementById('pwStrengthFill');
+  const label = document.getElementById('pwStrengthLabel');
+  if (!v) { bar.style.display = 'none'; label.style.display = 'none'; return; }
+  bar.style.display = 'block'; label.style.display = 'block';
+  let score = 0;
+  if (v.length >= 8)  score++;
+  if (v.length >= 12) score++;
+  if (/[A-Z]/.test(v)) score++;
+  if (/[0-9]/.test(v)) score++;
+  if (/[^A-Za-z0-9]/.test(v)) score++;
+  const levels = [
+    { pct: '20%', color: '#ef4444', text: 'Очень слабый' },
+    { pct: '40%', color: '#f97316', text: 'Слабый' },
+    { pct: '60%', color: '#eab308', text: 'Средний' },
+    { pct: '80%', color: '#22c55e', text: 'Надёжный' },
+    { pct: '100%', color: '#16a34a', text: 'Очень надёжный' },
+  ];
+  const lvl = levels[Math.min(score, 4)];
+  fill.style.width = lvl.pct; fill.style.background = lvl.color;
+  label.textContent = lvl.text; label.style.color = lvl.color;
+});
+
+// ── Совпадение паролей ───────────────────────────────────────
+document.getElementById('newPassword2').addEventListener('input', function() {
+  const p1 = document.getElementById('newPassword1').value;
+  if (!this.value) { msg('pwMatchMsg', '', false); return; }
+  if (this.value === p1) msg('pwMatchMsg', 'Пароли совпадают', false);
+  else msg('pwMatchMsg', 'Пароли не совпадают', true);
+});
+
+// ── Смена пароля ─────────────────────────────────────────────
+document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const p1 = document.getElementById('newPassword1').value;
+  const p2 = document.getElementById('newPassword2').value;
+  if (p1 !== p2) { msg('passwordMsg', 'Пароли не совпадают', true); return; }
+  if (p1.length < 8) { msg('passwordMsg', 'Пароль должен быть не менее 8 символов', true); return; }
+
+  const fd = new FormData(this);
+  const r = await fetch('{% url "change_password" %}', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd
+  });
+  const d = await r.json();
+  if (d.success) {
+    msgAuto('passwordMsg', 'Пароль изменён', false);
+    // Очищаем форму и убираем все вспомогательные элементы
+    this.reset();
+    msg('pwMatchMsg', '', false);
+    document.getElementById('pwStrengthBar').style.display = 'none';
+    document.getElementById('pwStrengthLabel').style.display = 'none';
+  } else {
+    const err = Object.values(d.errors || {}).join(' ') || d.message || 'Ошибка';
+    msg('passwordMsg', err, true);
+  }
+});
+</script>
+{% endblock %}

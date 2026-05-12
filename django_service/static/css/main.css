@@ -1,0 +1,264 @@
+/* ========== БАЗОВЫЕ ПЕРЕМЕННЫЕ ========== */
+html,
+body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+:root,
+[data-bs-theme="light"] {
+    --bg-body: #f5f7fb;
+    --text-color: #1a1f2e;
+    --card-bg: #ffffff;
+    --card-border: #eef2f6;
+    --navbar-bg: #ffffff;
+    --navbar-shadow: rgba(0, 0, 0, 0.05);
+    --input-bg: #ffffff;
+    --input-border: #e2e8f0;
+    --table-header-bg: #fafcff;
+    --footer-text: #7e8b9c;
+    --btn-outline-border: #cbd5e1;
+    --btn-outline-hover: #f8fafc;
+}
+
+[data-bs-theme="dark"] {
+    --bg-body: #0f172a;
+    --text-color: #eef2ff;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --navbar-bg: #0f172a;
+    --navbar-shadow: rgba(0, 0, 0, 0.3);
+    --input-bg: #0f172a;
+    --input-border: #475569;
+    --table-header-bg: #1e293b;
+    --footer-text: #94a3b8;
+    --btn-outline-border: #475569;
+    --btn-outline-hover: #334155;
+}
+
+/* Глобальные стили */
+body {
+    background-color: var(--bg-body) !important;
+    color: var(--text-color) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Navbar */
+.navbar {
+    background-color: var(--navbar-bg) !important;
+    box-shadow: 0 1px 3px var(--navbar-shadow);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text-color) !important;
+    letter-spacing: -0.02em;
+}
+
+.nav-link {
+    color: var(--text-color) !important;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.35rem 0.75rem !important;
+    border-radius: 8px;
+    position: relative;
+    transition: color 0.18s, background 0.18s;
+}
+
+/* Hover — мягкий фон */
+.nav-link:hover {
+    background: rgba(0, 0, 0, 0.045) !important;
+}
+[data-bs-theme="dark"] .nav-link:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Активная страница — тонкая линия снизу + чуть темнее текст */
+.nav-link.nav-active {
+    color: var(--text-color) !important;
+    font-weight: 600;
+}
+.nav-link.nav-active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text-color);
+    opacity: 0.55;
+    transition: width 0.2s;
+}
+.nav-link.nav-active:hover::after {
+    width: 28px;
+    opacity: 0.75;
+}
+
+.user-avatar {
+    background: #eef2ff;
+    border-radius: 40px;
+    padding: 5px 12px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #1a1f2e;
+}
+
+[data-bs-theme="dark"] .user-avatar {
+    background: #334155;
+    color: #eef2ff;
+}
+
+/* Карточки, формы, таблицы */
+.stat-card,
+.form-card,
+.strategy-card,
+.card-dashboard {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: 24px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.table-custom {
+    background-color: var(--card-bg) !important;
+    border-radius: 24px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.table-custom th {
+    background-color: var(--table-header-bg) !important;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.table-custom td {
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-color);
+}
+
+/* Кнопки — единое скругление для всех вариантов */
+.btn {
+    border-radius: 40px !important;
+    font-weight: 500;
+    transition: opacity 0.15s, transform 0.15s, background 0.18s;
+}
+.btn:active {
+    transform: scale(0.97);
+}
+
+
+.btn-primary-custom {
+    background: #0f172a;
+    border: none;
+    border-radius: 40px;
+    padding: 0.4rem 1.2rem;
+    font-weight: 500;
+    color: white;
+    transition: background 0.18s, opacity 0.18s;
+}
+.btn-primary-custom:hover {
+    background: #1e2a44;
+    color: white;
+}
+/* Тёмная тема: кнопка инвертируется — белый фон, тёмный текст */
+[data-bs-theme="dark"] .btn-primary-custom {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+[data-bs-theme="dark"] .btn-primary-custom:hover {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.btn-outline-custom {
+    border: 1px solid var(--btn-outline-border);
+    border-radius: 40px;
+    padding: 0.3rem 1rem;
+    font-weight: 500;
+    background: transparent;
+    color: var(--text-color);
+}
+
+.btn-outline-custom:hover {
+    background: var(--btn-outline-hover);
+}
+
+/* Поля ввода */
+input,
+select,
+textarea {
+    background-color: var(--input-bg) !important;
+    border: 1px solid var(--input-border) !important;
+    border-radius: 12px;
+    padding: 10px 14px;
+    width: 100%;
+    color: var(--text-color) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #1f3a6b !important;
+}
+
+/* Статистика */
+.stat-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #5f6c7a;
+}
+
+[data-bs-theme="dark"] .stat-title {
+    color: #94a3b8;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+/* Цвета изменений */
+.positive {
+    color: #2c7a4d;
+}
+
+.negative {
+    color: #b91c1c;
+}
+
+/* Футер */
+footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--footer-text);
+    margin-top: 3rem;
+    padding: 1rem;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .stat-value {
+        font-size: 1.4rem;
+    }
+
+    .table-custom th,
+    .table-custom td {
+        padding: 0.75rem;
+    }
+}

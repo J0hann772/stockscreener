@@ -1,0 +1,30 @@
+{% extends "base.html" %} {% block content %}
+<div class="row">
+  <div class="col-md-6">
+    <h3>Мои тикеры</h3>
+    <ul class="list-group">
+      {% for ticker in tickers %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <a href="{% url 'stock_detail' ticker.symbol %}" class="fw-semibold text-decoration-none" style="color:inherit;">
+          {{ ticker.symbol }}
+        </a>
+        <form action="{% url 'delete_ticker' ticker.id %}" method="post" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+        </form>
+      </li>
+      {% empty %}
+      <li class="list-group-item">У вас пока нет добавленных тикеров.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="col-md-6">
+    <h3>Добавить тикер</h3>
+    <form method="post">
+      {% csrf_token %} {{ form.as_p }}
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MarketView{% endblock %}</title>
+    <!-- Применяем сохранённую тему до парсинга DOM -->
+    <script>
+        (function () {
+            var t = localStorage.getItem('theme');
+            if (t === 'dark') document.documentElement.setAttribute('data-bs-theme', 'dark');
+        })();
+    </script>
+    {% load static%}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <!-- Bootstrap 5.3 (поддерживает тёмную тему) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Минимальные кастомные стили (для карточек и т.д.) -->
+    <style>
+        /* Базовые переопределения для тёмной темы */
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .stat-card,
+        .form-card,
+        .strategy-card,
+        .card-dashboard {
+            background-color: var(--bs-body-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 24px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .user-avatar {
+            background: var(--bs-secondary-bg);
+            border-radius: 40px;
+            padding: 5px 12px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-primary-custom {
+            background: #0f172a;
+            border: none;
+            border-radius: 40px;
+            padding: 0.4rem 1.2rem;
+            font-weight: 500;
+            color: #ffffff !important;
+            text-decoration: none;
+        }
+
+        .btn-primary-custom:hover,
+        .btn-primary-custom:focus,
+        .btn-primary-custom:active {
+            background: #1e3a5f;
+            color: #ffffff !important;
+        }
+
+        .btn-outline-custom {
+            border: 1px solid var(--bs-border-color);
+            border-radius: 40px;
+            padding: 0.3rem 1rem;
+            font-weight: 500;
+            background: transparent;
+            color: var(--bs-body-color);
+        }
+
+        .btn-outline-custom:hover {
+            background: var(--bs-secondary-bg);
+        }
+
+        .stat-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--bs-secondary-color);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--bs-body-color);
+        }
+
+        .positive {
+            color: #2c7a4d;
+        }
+
+        .negative {
+            color: #b91c1c;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--bs-secondary-color);
+            margin-top: 3rem;
+            padding: 1rem;
+        }
+
+        .table-custom {
+            background-color: var(--bs-body-bg);
+            border-radius: 24px;
+            overflow: hidden;
+        }
+
+        .table-custom th {
+            background-color: var(--bs-tertiary-bg);
+        }
+
+        @media (max-width: 768px) {
+            .stat-value {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{% url 'index' %}" style="letter-spacing: -0.5px;">stockscreener</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    {% if user.is_authenticated %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'ticker_list' %}">Мои тикеры</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'stocks_search' %}">Акции</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'strategy_list' %}">Стратегии</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'analysis_run' %}">Анализ</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'analysis_charts' %}">Графики</a></li>
+                    {% endif %}
+                </ul>
+
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                    <!-- Выпадающее меню инфо (знак вопроса) -->
+                    <li class="nav-item dropdown d-flex align-items-center">
+                        <a class="nav-link" href="#" id="opportunitiesDropdown" role="button" data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                            <i class="bi bi-question-circle fs-5 text-secondary"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="opportunitiesDropdown">
+                            <li><a class="dropdown-item" href="{% url 'howto' %}"><i class="bi bi-book me-2"></i>Как
+                                    начать</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Переключатель тёмной темы -->
+                    <li class="nav-item">
+                        <button id="themeToggle" class="btn btn-link nav-link" style="border: none; background: none;">
+                            <i class="bi bi-moon-stars" id="themeIcon"></i>
+                        </button>
+                    </li>
+
+                    <!-- Профиль / Вход -->
+                    {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <div class="user-avatar dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                        </div>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'profile' %}">Профиль</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">Выйти</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a href="{% url 'login' %}" class="btn btn-outline-custom me-2">Войти</a>
+                        <a href="{% url 'register' %}" class="btn btn-primary-custom">Регистрация</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        © 2026 Все права защищены
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script src="{% static 'js/main.js' %}"></script>
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+    {% block extra_js %}{% endblock %}
+
+    <script>
+        // Подсвечиваем активную ссылку навбара по текущему URL
+        (function () {
+            const path = window.location.pathname;
+            document.querySelectorAll('.navbar-nav .nav-link').forEach(function (link) {
+                const href = link.getAttribute('href');
+                if (!href || href === '#') return;
+                // Точное совпадение пути
+                if (path === href) {
+                    link.classList.add('nav-active');
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>

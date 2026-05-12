@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if is_edit %}Редактирование{% else %}Создание{% endif %} стратегии{% endblock %}
+
+{% block extra_css %}
+<style>
+  .builder-section {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    transition: box-shadow 0.2s;
+  }
+  .builder-section:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.75rem;
+  }
+  .section-label.must { color: #0ea5e9; }
+  .section-label.optional { color: #8b5cf6; }
+
+  .condition-card {
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    animation: slideIn 0.2s ease;
+    position: relative;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .indicator-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .indicator-badge:hover { background: var(--bs-secondary-bg); }
+
+  .param-input {
+    width: 80px;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 0.85rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+  }
+  .param-input:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
+
+  .op-select {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 3px 6px;
+    font-size: 0.85rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    cursor: pointer;
+  }
+
+  /* Модалка выбора индикатора */
+  .ind-modal-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .ind-modal-item:hover { background: var(--bs-tertiary-bg); border-color: var(--bs-border-color); }
+  .ind-modal-item .ind-name { font-weight: 600; font-size: 0.9rem; }
+  .ind-modal-item .ind-cat  { font-size: 0.72rem; color: var(--bs-secondary-color); }
+  .fav-btn { background: none; border: none; font-size: 1rem; padding: 0 4px; cursor: pointer; }
+  .info-toggle { background: none; border: none; color: var(--bs-secondary-color); cursor: pointer; }
+  .info-toggle:hover { color: #0ea5e9; }
+  .ind-info { font-size: 0.8rem; color: var(--bs-secondary-color); padding: 6px 14px 6px 14px; display: none; }
+  .ind-info.open { display: block; }
+
+  .ind-group-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--bs-secondary-color);
+    padding: 8px 14px 4px;
+    margin-top: 4px;
+  }
+
+  .or-group-wrapper {
+    border: 1.5px dashed var(--bs-border-color);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  .or-group-label {
+    position: absolute;
+    top: -11px;
+    left: 1rem;
+    background: var(--bs-body-bg);
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #8b5cf6;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .cross-indicator-row { margin-top: 8px; display: none; }
+  .cross-indicator-row.visible { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .ind-tabs .nav-link {
+    color: var(--bs-secondary-color);
+    border-radius: 8px;
+    padding: 6px 16px;
+    margin-right: 8px;
+    font-weight: 500;
+  }
+  .ind-tabs .nav-link.active {
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  
+  .cursor-pointer { cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{% url 'strategy_list' %}" class="btn btn-outline-custom btn-sm">← Назад</a>
+  <h3 class="mb-0">{% if is_edit %}Редактирование{% else %}Создание{% endif %} стратегии</h3>
+</div>
+
+<div id="builderApp">
+
+  <!-- Основные поля стратегии -->
+  <div class="builder-section">
+    <div class="section-label">Основная информация</div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="stratName">Название стратегии <span class="text-danger">*</span></label>
+      <input id="stratName" type="text" class="form-control"
+             placeholder="Например: RSI Oversold + EMA Cross"
+             value="{{ strategy.name|default:'' }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="stratDesc">Описание <span class="text-muted fw-normal fs-6">(необязательно)</span></label>
+      <textarea id="stratDesc" class="form-control" rows="2"
+                placeholder="Опишите логику стратегии...">{{ strategy.description|default:'' }}</textarea>
+    </div>
+  </div>
+
+  <!-- Обязательные условия (MUST) -->
+  <div class="builder-section">
+    <div class="section-label must">● Обязательные условия — ВСЕ должны выполниться (AND)</div>
+    <div id="must-container"></div>
+    <button type="button" class="btn btn-outline-custom btn-sm mt-1"
+            onclick="openIndicatorModal('must', null)">
+      <i class="bi bi-plus-lg me-1"></i>Добавить условие
+    </button>
+  </div>
+
+  <!-- OR-группы -->
+  <div id="or-groups-wrapper"></div>
+  <button type="button" class="btn btn-outline-custom btn-sm mb-4"
+          onclick="addOrGroup()">
+    <i class="bi bi-diagram-3 me-1"></i>Добавить OR-группу
+  </button>
+
+  <!-- Кнопки -->
+  <div class="d-flex gap-3 mt-2">
+    <button type="button" id="saveBtn" class="btn btn-primary-custom px-4"
+            onclick="saveStrategy()">
+      <span id="saveBtnSpinner" class="spinner-border spinner-border-sm me-2 d-none"></span>
+      Сохранить стратегию
+    </button>
+    <a href="{% url 'strategy_list' %}" class="btn btn-outline-custom">Отмена</a>
+  </div>
+  <div id="formError" class="text-danger mt-2 d-none"></div>
+</div>
+
+<!-- ═══ МОДАЛКА ВЫБОРА ИНДИКАТОРА ═══════════════════════════════════════════ -->
+<div class="modal fade" id="indicatorModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header pb-2">
+        <h5 class="modal-title">Выбор индикатора</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <!-- Поиск -->
+        <div class="position-relative mb-3">
+          <i class="bi bi-search text-muted position-absolute" style="top: 50%; left: 14px; transform: translateY(-50%); pointer-events: none;"></i>
+          <input id="indSearch" type="text" class="form-control shadow-none" style="padding-left: 36px; border-radius: 8px;"
+                 placeholder="Поиск индикатора..." oninput="filterIndicators()">
+        </div>
+        <!-- Вкладки -->
+        <ul class="nav nav-pills ind-tabs mb-3" id="indTabs">
+          <li class="nav-item">
+            <button class="nav-link active" onclick="setIndTab('all', this)">Все</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" onclick="setIndTab('fav', this)"><i class="bi bi-star-fill text-warning me-1"></i>Избранные</button>
+          </li>
+        </ul>
+        <!-- Список -->
+        <div id="indicatorList" style="max-height: 420px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ════════════════════════════════════════════════════════════════
+// КОНФИГ ИНДИКАТОРОВ
+// ════════════════════════════════════════════════════════════════
+const INDICATOR_META = {
+  rsi: {
+    label: 'RSI', category: 'Осциллятор',
+    scale: 'oscillator_0_100',
+    description: 'Индекс относительной силы (0–100). Выше 70 — перекупленность, ниже 30 — перепроданность.',
+    params: [{ key: 'length', label: 'Период', default: 14, min: 2, max: 200 }],
+    crossable_with: []   // нет смысла cross с другим индикатором
+  },
+  ema: {
+    label: 'EMA', category: 'Тренд',
+    scale: 'price_line',
+    description: 'Экспоненциальное скользящее среднее. Больший вес последним ценам. Используется для определения направления тренда.',
+    params: [{ key: 'length', label: 'Период', default: 9, min: 1, max: 500 }],
+    crossable_with: ['ema', 'sma']
+  },
+  sma: {
+    label: 'SMA', category: 'Тренд',
+    scale: 'price_line',
+    description: 'Простое скользящее среднее. Равный вес всем ценам. Медленнее EMA, меньше ложных сигналов.',
+    params: [{ key: 'length', label: 'Период', default: 9, min: 1, max: 500 }],
+    crossable_with: ['ema', 'sma']
+  },
+  macd: {
+    label: 'MACD', category: 'Тренд',
+    scale: 'macd_line',
+    description: 'Разность быстрой и медленной EMA. Histogram > 0 — бычий импульс. Пересечение сигнальной линии — сигнал входа.',
+    params: [
+      { key: 'fast',   label: 'Быстрый',   default: 12, min: 2, max: 100 },
+      { key: 'slow',   label: 'Медленный', default: 26, min: 2, max: 200 },
+      { key: 'signal', label: 'Сигнал',    default: 9,  min: 1, max: 50  },
+    ],
+    crossable_with: []
+  },
+  bb: {
+    label: 'Bollinger Bands', category: 'Волатильность',
+    scale: 'price_line',
+    description: 'Полосы волатильности вокруг SMA. Цена выше верхней полосы — перекупленность. Ниже нижней — перепроданность.',
+    params: [
+      { key: 'length', label: 'Период', default: 20, min: 2, max: 200 },
+      { key: 'std',    label: 'Откл (σ)', default: 2, min: 0.5, max: 5, step: 0.5 },
+    ],
+    crossable_with: []
+  },
+  atr: {
+    label: 'ATR', category: 'Волатильность',
+    scale: 'price_volatility',
+    description: 'Средний истинный диапазон свечи. Высокий ATR — высокая волатильность. Используется для стоп-лоссов.',
+    params: [{ key: 'length', label: 'Период', default: 14, min: 1, max: 100 }],
+    crossable_with: []
+  },
+  stoch: {
+    label: 'Stochastic', category: 'Осциллятор',
+    scale: 'oscillator_0_100',
+    description: 'Положение цены в диапазоне High-Low (0–100). Выше 80 — перекупленность, ниже 20 — перепроданность.',
+    params: [
+      { key: 'k',        label: '%K период', default: 14, min: 1, max: 100 },
+      { key: 'd',        label: '%D период', default: 3,  min: 1, max: 50  },
+      { key: 'smooth_k', label: 'Сглаживание', default: 3,min: 1, max: 50 },
+    ],
+    crossable_with: []
+  },
+  obv: {
+    label: 'OBV', category: 'Объём',
+    scale: 'volume_cumulative',
+    description: 'Балансовый объём. Растёт с ценой — подтверждение тренда. Дивергенция с ценой — сигнал разворота.',
+    params: [],
+    crossable_with: []
+  },
+  cci: {
+    label: 'CCI', category: 'Осциллятор',
+    scale: 'cci_scale',
+    description: 'Индекс товарного канала. Выше +100 — перекупленность, ниже -100 — перепроданность.',
+    params: [{ key: 'length', label: 'Период', default: 20, min: 2, max: 200 }],
+    crossable_with: []
+  },
+  adx: {
+    label: 'ADX', category: 'Тренд',
+    scale: 'oscillator_0_100',
+    description: 'Индекс направленного движения. Выше 25 — сильный тренд. Не показывает направление, только силу.',
+    params: [{ key: 'length', label: 'Период', default: 14, min: 1, max: 100 }],
+    crossable_with: []
+  },
+};
+
+const OPERATOR_LABELS = {
+  '>':          'Больше (>)',
+  '<':          'Меньше (<)',
+  '=':          'Равно (=)',
+  'cross_up':   '↑ Пересечение снизу',
+  'cross_down': '↓ Пересечение сверху',
+};
+
+// ════════════════════════════════════════════════════════════════
+// СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// ════════════════════════════════════════════════════════════════
+let conditions = [];         // все условия (объекты)
+let orGroupCount = 0;        // счётчик созданных OR-групп (только вверх)
+let _modalContext = null;    // { type: 'must'|'or', groupId: int|null, condId: int|null }
+let _condIdCounter = 0;
+
+const MAX_CONDITIONS = 15;   // лимит условий всего
+const MAX_OR_GROUPS  = 5;    // лимит OR-групп
+
+function nextId() { return ++_condIdCounter; }
+
+function _showLimitToast(msg) {
+  // Удаляем предыдущий тост если есть
+  const old = document.getElementById('limitToast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.id = 'limitToast';
+  t.style.cssText = `
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f1f5f9; padding: 10px 20px;
+    border-radius: 10px; font-size: 0.875rem; z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2); animation: slideIn 0.2s ease;
+  `;
+  t.textContent = '⚠ ' + msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+const favorites = new Set(JSON.parse(localStorage.getItem('ind_favorites') || '[]'));
+
+function toggleFav(indKey) {
+  if (favorites.has(indKey)) favorites.delete(indKey);
+  else favorites.add(indKey);
+  localStorage.setItem('ind_favorites', JSON.stringify([...favorites]));
+  renderIndicatorModal();
+}
+
+// ════════════════════════════════════════════════════════════════
+// МОДАЛКА ИНДИКАТОРОВ
+// ════════════════════════════════════════════════════════════════
+let _currentIndTab = 'all';
+
+function openIndicatorModal(type, groupId, condId = null) {
+  // При добавлении нового условия (condId === null) — проверяем лимит
+  if (condId === null && conditions.length >= MAX_CONDITIONS) {
+    _showLimitToast(`Максимум ${MAX_CONDITIONS} условий в стратегии`);
+    return;
+  }
+  _modalContext = { type, groupId, condId };
+  document.getElementById('indSearch').value = '';
+  renderIndicatorModal();
+  new bootstrap.Modal(document.getElementById('indicatorModal')).show();
+}
+
+function setIndTab(tab, btn) {
+  _currentIndTab = tab;
+  document.querySelectorAll('#indTabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderIndicatorModal();
+}
+
+function filterIndicators() { renderIndicatorModal(); }
+
+function renderIndicatorModal() {
+  const query = (document.getElementById('indSearch').value || '').toLowerCase();
+  const listEl = document.getElementById('indicatorList');
+  listEl.innerHTML = '';
+
+  const groups = {};
+  Object.entries(INDICATOR_META).forEach(([key, meta]) => {
+    if (_currentIndTab === 'fav' && !favorites.has(key)) return;
+    if (query && !meta.label.toLowerCase().includes(query) && !meta.category.toLowerCase().includes(query)) return;
+    if (!groups[meta.category]) groups[meta.category] = [];
+    groups[meta.category].push({ key, ...meta });
+  });
+
+  if (Object.keys(groups).length === 0) {
+    listEl.innerHTML = '<div class="text-muted text-center py-4">Ничего не найдено</div>';
+    return;
+  }
+
+  Object.entries(groups).forEach(([cat, items]) => {
+    listEl.insertAdjacentHTML('beforeend', `<div class="ind-group-title">${cat}</div>`);
+    items.forEach(({ key, label, description, params }) => {
+      const isFav = favorites.has(key);
+      const infoId = `info-${key}`;
+      const html = `
+        <div class="ind-modal-item" id="ind-row-${key}">
+          <div style="flex:1" onclick="selectIndicator('${key}')">
+            <span class="ind-name">${label}</span>
+            <span class="ind-cat ms-2">${params.length ? params.map(p=>p.label+': '+p.default).join(', ') : '—'}</span>
+          </div>
+          <button class="info-toggle me-1" type="button" onclick="event.stopPropagation();toggleInfo('${infoId}')">
+            <i class="bi bi-question-circle"></i>
+          </button>
+          <button class="fav-btn" type="button" onclick="event.stopPropagation();toggleFav('${key}');renderIndicatorModal()">
+            ${isFav ? '<i class="bi bi-star-fill text-warning fs-5"></i>' : '<i class="bi bi-star text-muted fs-5"></i>'}
+          </button>
+        </div>
+        <div class="ind-info" id="${infoId}">${description}</div>`;
+      listEl.insertAdjacentHTML('beforeend', html);
+    });
+  });
+}
+
+function toggleInfo(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function selectIndicator(key) {
+  bootstrap.Modal.getInstance(document.getElementById('indicatorModal')).hide();
+  const meta = INDICATOR_META[key];
+  const defaultParams = {};
+  meta.params.forEach(p => { defaultParams[p.key] = p.default; });
+
+  const cond = {
+    id: nextId(),
+    name: '',
+    indicator: key,
+    params: defaultParams,
+    operator: '>',
+    value: 0,
+    is_required: _modalContext.type === 'must',
+    group_id: _modalContext.groupId,
+    compare_to_indicator: null,
+    compare_to_params: null,
+  };
+
+  if (_modalContext.condId !== null) {
+    const idx = conditions.findIndex(c => c.id === _modalContext.condId);
+    if (idx !== -1) conditions[idx] = { ...conditions[idx], ...cond, id: _modalContext.condId };
+  } else {
+    conditions.push(cond);
+  }
+
+  renderBuilder();
+}
+
+// ════════════════════════════════════════════════════════════════
+// РЕНДЕР КОНСТРУКТОРА
+// ════════════════════════════════════════════════════════════════
+function renderBuilder() {
+  renderMust();
+  renderOrGroups();
+}
+
+function renderMust() {
+  const mustConds = conditions.filter(c => c.is_required);
+  const container = document.getElementById('must-container');
+  container.innerHTML = '';
+  mustConds.forEach(cond => container.appendChild(buildCondCard(cond, false)));
+}
+
+function renderOrGroups() {
+  const wrapper = document.getElementById('or-groups-wrapper');
+  wrapper.innerHTML = '';
+
+  const groupIds = [...new Set(
+    conditions.filter(c => !c.is_required).map(c => c.group_id)
+  )].filter(g => g !== null && g !== undefined).sort((a, b) => a - b);
+
+  groupIds.forEach((gid, index) => {
+    const visualIndex = index + 1;
+    const groupConds = conditions.filter(c => !c.is_required && c.group_id === gid);
+    const groupEl = document.createElement('div');
+    groupEl.className = 'builder-section or-group-wrapper';
+    groupEl.dataset.groupId = gid;
+
+    const labelHtml = `<div class="or-group-label">OR-группа #${visualIndex} — хотя бы одно из</div>`;
+    const removeGroupBtn = `<button type="button" class="btn btn-sm text-danger border-0" style="position: absolute; top: -14px; right: 1rem; background: var(--bs-body-bg); padding: 2px 8px; font-weight: 500; font-size: 0.75rem;" onclick="removeOrGroup(${gid})"><i class="bi bi-x-lg me-1"></i>Удалить группу</button>`;
+    const condContainer = document.createElement('div');
+    condContainer.id = `or-group-${gid}`;
+    groupConds.forEach(cond => condContainer.appendChild(buildCondCard(cond, true)));
+
+    groupEl.innerHTML = labelHtml + removeGroupBtn;
+    groupEl.appendChild(condContainer);
+    groupEl.insertAdjacentHTML('beforeend', `
+      <button type="button" class="btn btn-outline-custom btn-sm mt-2"
+              onclick="openIndicatorModal('or', ${gid})">
+        <i class="bi bi-plus-lg me-1"></i>Добавить условие в группу
+      </button>`);
+    wrapper.appendChild(groupEl);
+  });
+}
+
+function buildCondCard(cond, isOr) {
+  const meta = INDICATOR_META[cond.indicator] || {};
+  const card = document.createElement('div');
+  card.className = 'condition-card';
+  card.dataset.condId = cond.id;
+
+  // Имя условия
+  let html = `
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+      <input type="text" class="form-control form-control-sm" style="max-width:220px"
+             placeholder="Имя условия (необязательно)"
+             value="${cond.name || ''}"
+             oninput="updateCond(${cond.id}, 'name', this.value)">
+      <span class="indicator-badge" onclick="openIndicatorModal('${isOr ? 'or' : 'must'}', ${cond.group_id}, ${cond.id})">
+        ${meta.label || cond.indicator}
+        <i class="bi bi-chevron-down" style="font-size:0.7rem"></i>
+      </span>
+      <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
+              onclick="removeCondition(${cond.id})" style="border-radius:8px">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`;
+
+  // Параметры индикатора
+  if (meta.params && meta.params.length > 0) {
+    html += `<div class="d-flex align-items-center gap-2 flex-wrap mb-2">`;
+    meta.params.forEach(p => {
+      const val = (cond.params && cond.params[p.key] !== undefined) ? cond.params[p.key] : p.default;
+      html += `
+        <label class="text-muted" style="font-size:0.8rem">${p.label}:
+          <input type="number" class="param-input" value="${val}" min="${p.min}" max="${p.max}" step="${p.step||1}"
+                 onchange="let v=parseFloat(this.value); if(v<${p.min})v=${p.min}; if(v>${p.max})v=${p.max}; this.value=v; updateParam(${cond.id}, '${p.key}', v)">
+        </label>`;
+    });
+    html += `</div>`;
+  }
+
+  // Оператор и значение
+  const isCross = cond.operator === 'cross_up' || cond.operator === 'cross_down';
+  const canCross = meta.crossable_with && meta.crossable_with.length > 0;
+  let opsHtml = `<div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="text-muted" style="font-size:0.8rem">если</span>
+    <select class="op-select" onchange="updateOperator(${cond.id}, this.value)">`;
+  Object.entries(OPERATOR_LABELS).forEach(([op, label]) => {
+    const crossOp = op === 'cross_up' || op === 'cross_down';
+    if (crossOp && !canCross) return;   // Скрываем cross-опции если нет смысла
+    opsHtml += `<option value="${op}" ${cond.operator === op ? 'selected' : ''}>${label}</option>`;
+  });
+  opsHtml += `</select>`;
+
+  // Значение (скрываем при cross_indicator)
+  const hasCompare = !!cond.compare_to_indicator;
+  opsHtml += `
+    <input type="number" class="param-input" style="width:90px" step="0.01"
+           value="${cond.value !== null && cond.value !== undefined ? cond.value : 0}"
+           ${hasCompare ? 'style="display:none"' : ''}
+           id="val-${cond.id}"
+           onchange="updateCond(${cond.id}, 'value', parseFloat(this.value))">
+  </div>`;
+
+  // Блок сравнения с другим индикатором (при cross_up/cross_down)
+  if (canCross) {
+    const displayCross = isCross ? 'visible' : '';
+    const crossMeta = cond.compare_to_indicator ? INDICATOR_META[cond.compare_to_indicator] : null;
+    let crossSelect = `<select class="op-select" onchange="updateCrossIndicator(${cond.id}, this.value)">
+      <option value="">—выбрать—</option>`;
+    meta.crossable_with.forEach(ck => {
+      const cm = INDICATOR_META[ck];
+      crossSelect += `<option value="${ck}" ${cond.compare_to_indicator === ck ? 'selected' : ''}>${cm.label}</option>`;
+    });
+    crossSelect += `</select>`;
+
+    let crossParams = '';
+    if (crossMeta && crossMeta.params.length > 0) {
+      crossMeta.params.forEach(p => {
+        const v = (cond.compare_to_params && cond.compare_to_params[p.key] !== undefined)
+          ? cond.compare_to_params[p.key] : p.default;
+        crossParams += `<label class="text-muted" style="font-size:0.8rem">${p.label}:
+          <input type="number" class="param-input" value="${v}" min="${p.min}" max="${p.max}"
+                 onchange="let v=parseFloat(this.value); if(v<${p.min})v=${p.min}; if(v>${p.max})v=${p.max}; this.value=v; updateCrossParam(${cond.id}, '${p.key}', v)">
+          </label>`;
+      });
+    }
+
+    opsHtml += `
+      <div class="cross-indicator-row ${displayCross}" id="cross-row-${cond.id}">
+        <span class="text-muted" style="font-size:0.8rem">индикатор:</span>
+        ${crossSelect}
+        ${crossParams}
+      </div>`;
+  }
+
+  html += opsHtml;
+  card.innerHTML = html;
+  return card;
+}
+
+// ════════════════════════════════════════════════════════════════
+// ОБНОВЛЕНИЕ СОСТОЯНИЯ
+// ════════════════════════════════════════════════════════════════
+function updateCond(id, key, val) {
+  const c = conditions.find(c => c.id === id);
+  if (c) c[key] = val;
+}
+
+function updateParam(id, paramKey, val) {
+  const c = conditions.find(c => c.id === id);
+  if (c) { if (!c.params) c.params = {}; c.params[paramKey] = parseFloat(val); }
+}
+
+function updateCrossParam(id, paramKey, val) {
+  const c = conditions.find(c => c.id === id);
+  if (c) { if (!c.compare_to_params) c.compare_to_params = {}; c.compare_to_params[paramKey] = parseFloat(val); }
+}
+
+function updateOperator(id, op) {
+  const c = conditions.find(c => c.id === id);
+  if (!c) return;
+  c.operator = op;
+  const isCross = op === 'cross_up' || op === 'cross_down';
+  const crossRow = document.getElementById(`cross-row-${id}`);
+  const valInput = document.getElementById(`val-${id}`);
+  if (crossRow) crossRow.classList.toggle('visible', isCross);
+  if (valInput) valInput.style.display = isCross && c.compare_to_indicator ? 'none' : '';
+  if (!isCross) { c.compare_to_indicator = null; c.compare_to_params = null; }
+}
+
+function updateCrossIndicator(id, indKey) {
+  const c = conditions.find(c => c.id === id);
+  if (!c) return;
+  c.compare_to_indicator = indKey || null;
+  c.compare_to_params = indKey && INDICATOR_META[indKey]
+    ? Object.fromEntries(INDICATOR_META[indKey].params.map(p => [p.key, p.default])) : null;
+  renderBuilder();
+}
+
+function removeCondition(id) {
+  conditions = conditions.filter(c => c.id !== id);
+  renderBuilder();
+}
+
+function addOrGroup() {
+  const activeGroups = new Set(
+    conditions.filter(c => !c.is_required && c.group_id !== null).map(c => c.group_id)
+  ).size;
+  if (activeGroups >= MAX_OR_GROUPS) {
+    _showLimitToast(`Максимум ${MAX_OR_GROUPS} OR-групп в стратегии`);
+    return;
+  }
+  orGroupCount++;
+  openIndicatorModal('or', orGroupCount);
+}
+
+function removeOrGroup(gid) {
+  conditions = conditions.filter(c => !(c.group_id === gid && !c.is_required));
+  renderBuilder();
+}
+
+// ════════════════════════════════════════════════════════════════
+// СОХРАНЕНИЕ
+// ════════════════════════════════════════════════════════════════
+function saveStrategy() {
+  const name = document.getElementById('stratName').value.trim();
+  const errorEl = document.getElementById('formError');
+  errorEl.classList.add('d-none');
+
+  if (!name) {
+    errorEl.textContent = 'Введите название стратегии';
+    errorEl.classList.remove('d-none');
+    return;
+  }
+
+  if (conditions.length > MAX_CONDITIONS) {
+    errorEl.textContent = `Превышен лимит условий (максимум ${MAX_CONDITIONS})`;
+    errorEl.classList.remove('d-none');
+    return;
+  }
+
+  const payload = {
+    name,
+    description: document.getElementById('stratDesc').value,
+    is_active: true,
+    conditions: conditions.map(c => ({
+      name: c.name || '',
+      indicator: c.indicator,
+      params: c.params || {},
+      operator: c.operator,
+      value: c.value,
+      is_required: c.is_required,
+      group_id: c.group_id,
+      compare_to_indicator: c.compare_to_indicator || null,
+      compare_to_params: c.compare_to_params || null,
+    })),
+  };
+
+  const btn = document.getElementById('saveBtn');
+  const spinner = document.getElementById('saveBtnSpinner');
+  btn.disabled = true;
+  spinner.classList.remove('d-none');
+
+  const url = {% if is_edit %}'{% url "strategy_edit" strategy.pk %}'{% else %}'{% url "strategy_create" %}'{% endif %};
+
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}',
+    },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      window.location.href = data.redirect;
+    } else {
+      errorEl.textContent = data.error || 'Ошибка сохранения';
+      errorEl.classList.remove('d-none');
+      btn.disabled = false;
+      spinner.classList.add('d-none');
+    }
+  })
+  .catch(() => {
+    errorEl.textContent = 'Ошибка соединения';
+    errorEl.classList.remove('d-none');
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// ИНИЦИАЛИЗАЦИЯ
+// ════════════════════════════════════════════════════════════════
+{% if is_edit and conditions_json %}
+const _existingConditions = {{ conditions_json|safe }};
+_existingConditions.forEach(c => {
+  conditions.push({
+    id: nextId(),
+    name: c.name || '',
+    indicator: c.indicator,
+    params: c.params || {},
+    operator: c.operator,
+    value: c.value,
+    is_required: c.is_required,
+    group_id: c.group_id,
+    compare_to_indicator: c.compare_to_indicator,
+    compare_to_params: c.compare_to_params,
+  });
+  if (c.group_id && c.group_id > orGroupCount) orGroupCount = c.group_id;
+});
+{% endif %}
+
+renderBuilder();
+renderIndicatorModal();
+</script>
+{% endblock %}

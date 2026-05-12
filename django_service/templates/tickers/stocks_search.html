@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Акции | MarketView{% endblock %}
+
+{% block extra_css %}
+<style>
+  .search-hero {
+    text-align: center;
+    padding: 3rem 0 2rem;
+  }
+  .search-hero h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .search-hero p {
+    color: var(--bs-secondary-color);
+    margin-bottom: 1.5rem;
+  }
+  .search-box {
+    display: flex;
+    gap: 0.5rem;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .search-box input {
+    flex: 1;
+    border-radius: 40px;
+    border: 1px solid var(--bs-border-color);
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-box input:focus { border-color: #0f172a; }
+  .search-box button {
+    border-radius: 40px;
+    padding: 0.6rem 1.4rem;
+    font-weight: 600;
+  }
+
+  .result-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    margin-top: 2rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .result-card .company-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  .result-card .ticker-symbol {
+    font-size: 0.9rem;
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+  }
+  .result-card .price {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  [data-bs-theme="dark"] .result-card .price { color: #f8fafc; }
+  .info-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .info-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+  }
+  .info-value {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .btn-open-detail {
+    border-radius: 40px;
+    padding: 0.5rem 1.4rem;
+    font-weight: 600;
+  }
+  .error-card {
+    max-width: 500px;
+    margin: 2rem auto;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-hero">
+  <h1>
+    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;opacity:.55;margin-right:6px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Поиск акций
+  </h1>
+  <p>Введите тикер акции, чтобы получить подробную информацию</p>
+  <form method="get" action="{% url 'stocks_search' %}">
+    <div class="search-box">
+      <input type="text"
+             name="q"
+             id="ticker-input"
+             value="{{ query }}"
+             placeholder="Например: AAPL, TSLA, NVDA"
+             autocomplete="off"
+             autocapitalize="characters"
+             spellcheck="false">
+      <button type="submit" class="btn btn-primary-custom">Найти</button>
+    </div>
+  </form>
+</div>
+
+{% if error %}
+<div class="error-card">
+  <i class="bi bi-exclamation-circle text-warning fs-2 mb-2 d-block"></i>
+  <div class="fw-semibold mb-1">Тикер не найден</div>
+  <div class="text-muted" style="font-size: .875rem;">{{ error }}</div>
+</div>
+
+{% elif result %}
+<div class="result-card">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <div class="company-name">{{ result.name }}</div>
+      <div class="ticker-symbol mt-1">
+        <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">{{ result.symbol }}</span>
+        {% if result.exchange %}<span class="text-muted">· {{ result.exchange }}</span>{% endif %}
+        {% if result.sector and result.sector != '—' %}<span class="text-muted"> · {{ result.sector }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="text-end">
+      {% if result.price %}
+      <div class="price">{{ result.price }} {{ result.currency }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="info-row mt-3">
+    {% if result.market_cap and result.market_cap != '—' %}
+    <div class="info-item">
+      <span class="info-label">Капитализация</span>
+      <span class="info-value">{{ result.market_cap }}</span>
+    </div>
+    {% endif %}
+    {% if result.pe_ratio and result.pe_ratio != '—' %}
+    <div class="info-item">
+      <span class="info-label">P/E</span>
+      <span class="info-value">{{ result.pe_ratio }}</span>
+    </div>
+    {% endif %}
+    {% if result.eps and result.eps != '—' %}
+    <div class="info-item">
+      <span class="info-label">EPS</span>
+      <span class="info-value">{{ result.eps }}</span>
+    </div>
+    {% endif %}
+    {% if result.dividend_yield and result.dividend_yield != '—' %}
+    <div class="info-item">
+      <span class="info-label">Дивиденды</span>
+      <span class="info-value">{{ result.dividend_yield }}</span>
+    </div>
+    {% endif %}
+    {% if result.beta and result.beta != '—' %}
+    <div class="info-item">
+      <span class="info-label">Beta</span>
+      <span class="info-value">{{ result.beta }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <a href="{% url 'stock_detail' result.symbol %}"
+       class="btn btn-primary-custom btn-open-detail">
+      <i class="bi bi-graph-up me-1"></i>Открыть страницу акции
+    </a>
+  </div>
+</div>
+
+{% elif query %}
+<div class="error-card">
+  <i class="bi bi-search text-muted fs-2 mb-2 d-block"></i>
+  <div class="text-muted">Нет данных по запросу «{{ query }}»</div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Автофокус на поле ввода
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('ticker-input');
+    if (input && !input.value) input.focus();
+    // Авто-капитализация при вводе
+    if (input) {
+      input.addEventListener('input', function() {
+        const pos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(pos, pos);
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+{% block title %}Графики{% endblock %}
+
+{% block extra_css %}
+<style>
+  .controls-panel {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .chart-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    background: var(--bs-body-bg);
+  }
+  .chart-card-header {
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+  .chart-card-header .sym {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+  }
+  .chart-card-header .price-info {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+  }
+  .chart-canvas {
+    width: 100%;
+    height: 440px;
+    position: relative;
+  }
+  .chart-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bs-secondary-color);
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+  .nav-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Загружаем Lightweight Charts CDN -->
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h3 class="mb-0">Графики (Скринер)</h3>
+</div>
+
+<div class="controls-panel">
+  <div class="row g-3 align-items-end">
+    <!-- Источник -->
+    <div class="col-md-5">
+      <label class="form-label" style="font-size:.85rem;font-weight:600;">Источник тикеров</label>
+      <select id="sourceSelect" class="form-select" onchange="loadSource()">
+        {% if preload_tickers %}
+        <option value="preload" data-tickers="{{ preload_tickers|join:',' }}" selected>
+          Прошли стратегию ({{ preload_tickers|length }} шт)
+        </option>
+        <option disabled style="font-size:.7rem;color:var(--bs-secondary-color);">──────────────</option>
+        {% endif %}
+        <option value="profile">Мой профиль ({{ profile_tickers|length }})</option>
+        {% if analyses %}
+        <optgroup label="Прошли стратегию (из истории)">
+          {% for run in analyses %}
+          <option value="history-{{ run.id }}" data-tickers="{{ run.matched_tickers|join:',' }}">
+            {{ run.strategy_name }} · {{ run.created_at|date:"d.m.Y" }} ({{ run.tickers_matched }} шт)
+          </option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+      </select>
+    </div>
+
+    <!-- Таймфрейм -->
+    <div class="col-md-3">
+      <label class="form-label" style="font-size:.85rem;font-weight:600;">Таймфрейм</label>
+      <select id="tfSelect" class="form-select" onchange="renderCharts()">
+        <option value="5m">5 мин</option>
+        <option value="30m">30 мин</option>
+        <option value="1h">1 час</option>
+        <option value="4h">4 часа</option>
+        <option value="1d" selected>День (1D)</option>
+        <option value="1w">Неделя (1W)</option>
+        <option value="1mo">Месяц (1M)</option>
+      </select>
+    </div>
+
+    <!-- Добавить вручную -->
+    <div class="col-md-4">
+      <label class="form-label" style="font-size:.85rem;font-weight:600;">Добавить тикер (временно)</label>
+      <div class="input-group">
+        <input type="text" id="addInput" class="form-control" placeholder="Например: MSFT" oninput="this.classList.remove('is-invalid')">
+        <button class="btn btn-primary-custom ms-2" onclick="addTicker()"><i class="bi bi-plus-lg me-1"></i>Добавить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cols-1 row-cols-lg-2" id="chartsGrid"></div>
+<div class="nav-pagination" id="paginationControls"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Данные
+const PROFILE_TICKERS = [{% for t in profile_tickers %}"{{ t }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+const PRELOAD_TICKERS = [{% for t in preload_tickers %}"{{ t }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+const FASTAPI_URL = 'http://localhost:8001';
+// tf -> { intraday: bool }
+const INTRADAY_TFS = new Set(['5m','30m','1h','4h']);
+
+let tickers = [];
+let page = 1;
+const PER_PAGE = 8;
+const chartInstances  = new Map();  // sym -> chart
+const chartSeriesMap  = new Map();  // sym -> { candle, volume }
+
+// Тема
+function getThemeColors() {
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  return {
+    background:  isDark ? '#0f172a' : '#ffffff',
+    textColor:   isDark ? '#94a3b8' : '#64748b',
+    gridColor:   isDark ? '#1e293b' : '#f1f5f9',
+    borderColor: isDark ? '#334155' : '#e2e8f0',
+  };
+}
+
+function applyThemeToChart(chart) {
+  const c = getThemeColors();
+  chart.applyOptions({
+    layout: { background: { type: 'solid', color: c.background }, textColor: c.textColor },
+    grid:   { vertLines: { color: c.gridColor }, horzLines: { color: c.gridColor } },
+    rightPriceScale: { borderColor: c.borderColor },
+    timeScale:       { borderColor: c.borderColor },
+  });
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+  new MutationObserver(() => {
+    chartInstances.forEach(chart => applyThemeToChart(chart));
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
+
+  // Если пришли из истории с ?tickers= — используем эти тикеры напрямую
+  if (PRELOAD_TICKERS.length > 0) {
+    tickers = [...PRELOAD_TICKERS];
+    page = 1;
+    renderCharts();
+    // sourceSelect уже выставлен в шаблоне через selected
+  } else {
+    loadSource(false);
+  }
+
+  document.getElementById('addInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') addTicker();
+  });
+});
+
+function loadSource(fromUserAction = true) {
+  const sel = document.getElementById('sourceSelect');
+  const opt = sel.options[sel.selectedIndex];
+
+  // При F5 (fromUserAction=false) берем из сессии, если источник не поменялся
+  if (!fromUserAction) {
+    const savedSource = sessionStorage.getItem('charts_saved_source');
+    const savedTickers = sessionStorage.getItem('charts_saved_tickers');
+    if (savedSource === opt.value && savedTickers) {
+      tickers = JSON.parse(savedTickers);
+      page = 1;
+      renderCharts();
+      return;
+    }
+  }
+
+  if (opt.value === 'profile') {
+    tickers = [...PROFILE_TICKERS];
+  } else if (opt.value === 'preload') {
+    tickers = PRELOAD_TICKERS.length > 0 ? [...PRELOAD_TICKERS] : [];
+  } else {
+    const raw = opt.getAttribute('data-tickers') || '';
+    tickers = raw.split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  saveState();
+  page = 1;
+  renderCharts();
+}
+
+function saveState() {
+  const sel = document.getElementById('sourceSelect');
+  sessionStorage.setItem('charts_saved_source', sel.options[sel.selectedIndex].value);
+  sessionStorage.setItem('charts_saved_tickers', JSON.stringify(tickers));
+}
+
+function addTicker() {
+  const input = document.getElementById('addInput');
+  const sym = input.value.trim().toUpperCase();
+  
+  if (!sym) return;
+  const validRegex = /^[A-Z0-9.-]{1,10}$/;
+  if (!validRegex.test(sym)) {
+    input.classList.add('is-invalid');
+    return;
+  }
+
+  if (!tickers.includes(sym)) {
+    tickers.unshift(sym); // Добавляем в начало
+    input.value = '';
+    saveState();
+    page = 1; // Возвращаемся на 1 стр, чтобы увидеть
+    renderCharts();
+  } else {
+    input.value = '';
+  }
+}
+
+function removeTicker(symToRemove) {
+  tickers = tickers.filter(t => t !== symToRemove);
+  saveState();
+  
+  const totalPages = Math.ceil(tickers.length / PER_PAGE);
+  if (page > totalPages && page > 1) page = totalPages;
+  renderCharts();
+}
+
+function renderCharts() {
+  const grid = document.getElementById('chartsGrid');
+  const pagination = document.getElementById('paginationControls');
+  
+  const currentTf = document.getElementById('tfSelect').value;
+  const isIntraday = INTRADAY_TFS.has(currentTf);
+
+  if (tickers.length === 0) {
+    grid.innerHTML = '<div class="w-100 d-flex flex-column align-items-center justify-content-center py-5 text-muted" id="emptyStateMsg"><i class="bi bi-bar-chart fs-1 mb-2"></i><span>Список пуст</span></div>';
+    pagination.innerHTML = '';
+    chartInstances.clear();
+    return;
+  }
+  
+  const emptyMsg = document.getElementById('emptyStateMsg');
+  if (emptyMsg) emptyMsg.remove();
+
+  const totalPages = Math.ceil(tickers.length / PER_PAGE);
+  page = Math.max(1, Math.min(page, totalPages));
+  const pageTickers = tickers.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  // 1. Очищаем графики, которых больше нет на ТЕКУЩЕЙ странице
+  for (const [sym, chart] of chartInstances.entries()) {
+    if (!pageTickers.includes(sym)) {
+      chartInstances.delete(sym);
+      const col = document.getElementById('col-' + sym);
+      if (col) col.remove();
+    }
+  }
+
+  const c = getThemeColors();
+
+  // Флаг: изменился ли таймфрейм (нужно перезагрузить данные существующих графиков)
+  const tfChanged = (renderCharts._lastTf !== currentTf);
+  renderCharts._lastTf = currentTf;
+
+  // 2. Добавляем новые и сортируем существующие блоки в правильном порядке
+  pageTickers.forEach((sym, index) => {
+    let col = document.getElementById('col-' + sym);
+    let isNew = false;
+    
+    // Если таймфрейм изменился — перезагружаем данные даже для существующих графиков
+    if (!isNew && tfChanged && chartInstances.has(sym)) {
+      const existChart = chartInstances.get(sym);
+      // Обновляем timeScale для нового TF
+      existChart.applyOptions({
+        timeScale: { timeVisible: isIntraday, secondsVisible: false }
+      });
+      const loadEl = document.getElementById('load-' + sym);
+      if (loadEl) loadEl.style.display = 'flex';
+      document.getElementById('price-' + sym).textContent = 'Загрузка...';
+      _fetchChartData(sym, currentTf, existChart);
+    }
+
+    if (!col) {
+      isNew = true;
+      col = document.createElement('div');
+      col.className = 'col';
+      col.id = 'col-' + sym;
+
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      
+      card.innerHTML = `
+        <div class="chart-card-header">
+          <a class="sym" href="/tickers/stocks/${sym}/" style="text-decoration:none;color:inherit;" title="Открыть подробнее">${sym}</a>
+          <div class="d-flex align-items-center">
+            <span class="price-info me-3" id="price-${sym}">Загрузка...</span>
+            <button type="button" class="btn-close" style="font-size: 0.65em;" onclick="removeTicker('${sym}')" title="Убрать график"></button>
+          </div>
+        </div>
+        <div class="chart-canvas" id="chart-${sym}">
+          <div class="chart-loading" id="load-${sym}">
+            <div class="spinner-border spinner-border-sm"></div> Загрузка...
+          </div>
+        </div>
+      `;
+      col.appendChild(card);
+    }
+    
+    // Синхронизация порядка элементов DOM
+    if (grid.children[index] !== col) {
+      grid.insertBefore(col, grid.children[index] || null);
+    }
+
+    // Если блок новый, инициализируем график
+    if (isNew) {
+      const container = document.getElementById('chart-' + sym);
+      const chartDiv = document.createElement('div');
+      chartDiv.style.width  = '100%';
+      chartDiv.style.height = '440px';
+      container.appendChild(chartDiv);
+
+      const chart = LightweightCharts.createChart(chartDiv, {
+        width:  chartDiv.clientWidth,
+        height: 440,
+        layout: { background: { type: 'solid', color: c.background }, textColor: c.textColor },
+        grid:   { vertLines: { color: c.gridColor }, horzLines: { color: c.gridColor } },
+        rightPriceScale: { borderColor: c.borderColor },
+        timeScale: {
+          borderColor:    c.borderColor,
+          timeVisible:    isIntraday,
+          secondsVisible: false,
+        },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      });
+
+      // Применяем актуальную тему (важно если тема переключена до загрузки)
+      applyThemeToChart(chart);
+
+      chartInstances.set(sym, chart);
+
+      const candleSeries = chart.addCandlestickSeries({
+        upColor: '#22c55e', downColor: '#ef4444',
+        borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+        wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+      });
+
+      const volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+      });
+      chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+
+      // Сохраняем series для обновления при смене TF
+      chartSeriesMap.set(sym, { candle: candleSeries, volume: volumeSeries });
+
+      new ResizeObserver(entries => {
+        for (const entry of entries) chart.applyOptions({ width: entry.contentRect.width });
+      }).observe(chartDiv);
+
+      _fetchChartData(sym, currentTf, chart, candleSeries, volumeSeries);
+    }
+  });
+
+  // Пагинация
+  pagination.innerHTML = '';
+  if (totalPages > 1) {
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.className = `btn btn-sm ${i === page ? 'btn-primary-custom' : 'btn-outline-custom'}`;
+      btn.onclick = () => { page = i; renderCharts(); window.scrollTo(0, 0); };
+      pagination.appendChild(btn);
+    }
+  }
+}
+
+// Загрузка данных для одного графика (вынесено чтобы не дублировать код)
+function _fetchChartData(sym, tf, chart, candleSeries, volumeSeries) {
+  // candleSeries/volumeSeries могут быть undefined при обновлении таймфрейма
+  // в этом случае берём series из хранилища
+  const series = chartSeriesMap.get(sym);
+  const cs = candleSeries || (series && series.candle);
+  const vs = volumeSeries   || (series && series.volume);
+
+  fetch(`${FASTAPI_URL}/chart-data/${sym}?tf=${tf}`)
+    .then(r => r.json())
+    .then(data => {
+      const loadEl = document.getElementById('load-' + sym);
+      if (loadEl) loadEl.style.display = 'none';
+      if (data.error) {
+        const priceEl = document.getElementById('price-' + sym);
+        if (priceEl) priceEl.textContent = '⚠ ' + data.error;
+        return;
+      }
+      if (data.candles && data.candles.length > 0) {
+        if (cs) cs.setData(data.candles);
+        if (vs) vs.setData(data.volume || []);
+        const last = data.candles[data.candles.length - 1];
+        const prev = data.candles.length > 1 ? data.candles[data.candles.length - 2] : last;
+        const change = ((last.close - prev.close) / prev.close * 100).toFixed(2);
+        const sign = change >= 0 ? '+' : '';
+        const color = last.close >= prev.close ? '#22c55e' : '#ef4444';
+        const priceEl = document.getElementById('price-' + sym);
+        if (priceEl) priceEl.innerHTML = `<span style="color:${color}">$${last.close.toFixed(2)} (${sign}${change}%)</span>`;
+        chart.timeScale().fitContent();
+      }
+    })
+    .catch(() => {
+      const loadEl = document.getElementById('load-' + sym);
+      if (loadEl) loadEl.style.display = 'none';
+      const priceEl = document.getElementById('price-' + sym);
+      if (priceEl) priceEl.textContent = '⚠ Ошибка загрузки';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ symbol }} | MarketView{% endblock %}
+
+{% block extra_css %}
+<style>
+.stock-header{padding:1.5rem 0 1rem;border-bottom:1px solid var(--bs-border-color);}
+.stock-price{font-size:2.2rem;font-weight:700;}
+.chart-container{position:relative;height:500px;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:16px;overflow:hidden;margin:1rem 0;}
+#main-chart{height:100%;}
+.indicator-panel{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:16px;padding:1rem;margin-bottom:1rem;}
+.indicator-panel h6{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--bs-secondary-color);margin-bottom:.75rem;}
+.ind-btn{border-radius:20px;padding:3px 12px;font-size:.8rem;font-weight:600;border:1px solid var(--bs-border-color);background:transparent;color:var(--bs-body-color);cursor:pointer;transition:all .15s;}
+.ind-btn.active{background:#0f172a;color:#fff !important;border-color:#0f172a;}
+[data-bs-theme="dark"] .ind-btn.active{background:#f8fafc;color:#0f172a !important;}
+.period-btn{border-radius:8px;padding:3px 10px;font-size:.8rem;border:1px solid var(--bs-border-color);background:transparent;color:var(--bs-secondary-color);cursor:pointer;}
+.period-btn.active{background:var(--bs-secondary-bg);color:var(--bs-body-color);font-weight:600;}
+.sub-chart-container{height:140px;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:12px;overflow:hidden;margin-bottom:.5rem;}
+.info-section{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:16px;padding:1.5rem;margin-bottom:1rem;}
+.info-section h5{font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;color:var(--bs-secondary-color);margin-bottom:1rem;border-bottom:1px solid var(--bs-border-color);padding-bottom:.5rem;}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;}
+.info-item .label{font-size:.72rem;color:var(--bs-secondary-color);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.info-item .value{font-weight:600;font-size:.9rem;margin-top:2px;}
+.strategy-result{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:16px;padding:1.5rem;margin-top:1rem;}
+.cond-row{display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--bs-border-color);}
+.cond-row:last-child{border-bottom:none;}
+.badge-ok{background:rgba(34,197,94,.12);color:#16a34a;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;}
+.badge-fail{background:rgba(239,68,68,.1);color:#dc2626;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;}
+#spinner-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1055;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+#spinner-overlay.active{display:flex;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="spinner-overlay">
+  <div class="spinner-border text-light" style="width:3rem;height:3rem;"></div>
+  <div style="color:#fff;font-weight:500;" id="spinnerText">Загружаем данные…</div>
+</div>
+
+<div class="stock-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <div style="font-size:.85rem;color:var(--bs-secondary-color);" id="stockSector">Загрузка…</div>
+      <h1 style="font-size:1.8rem;font-weight:800;margin:.2rem 0;" id="stockName">{{ symbol }}</h1>
+      <div style="font-size:.9rem;color:var(--bs-secondary-color);" id="stockMeta"></div>
+    </div>
+    <div class="text-end">
+      <div class="stock-price" id="stockPrice">—</div>
+      <div style="font-size:.85rem;color:var(--bs-secondary-color);" id="stockPriceInfo"></div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex align-items-center gap-2 mt-3 mb-2 flex-wrap">
+  <div class="d-flex gap-1 flex-wrap">
+    <button class="period-btn" onclick="changeTF('5m',this)">5m</button>
+    <button class="period-btn" onclick="changeTF('30m',this)">30m</button>
+    <button class="period-btn" onclick="changeTF('1h',this)">1h</button>
+    <button class="period-btn" onclick="changeTF('4h',this)">4h</button>
+    <button class="period-btn active" onclick="changeTF('1d',this)">1D</button>
+    <button class="period-btn" onclick="changeTF('1w',this)">1W</button>
+    <button class="period-btn" onclick="changeTF('1mo',this)">1M</button>
+  </div>
+  <div class="ms-auto d-flex gap-1">
+    <button class="ind-btn" id="btn-sma" onclick="toggleOverlay('sma')">SMA 20</button>
+    <button class="ind-btn" id="btn-ema" onclick="toggleOverlay('ema')">EMA 50</button>
+  </div>
+</div>
+
+<div class="chart-container"><div id="main-chart"></div></div>
+<div id="sub-charts"></div>
+
+<div class="indicator-panel">
+  <h6>Индикаторы под графиком</h6>
+  <div class="d-flex flex-wrap gap-2">
+    <button class="ind-btn" id="btn-rsi"  onclick="toggleSub('rsi')">RSI 14</button>
+    <button class="ind-btn" id="btn-macd" onclick="toggleSub('macd')">MACD</button>
+    <button class="ind-btn" id="btn-vol"  onclick="toggleSub('vol')">Объём</button>
+  </div>
+</div>
+
+{% if strategies %}
+<div class="info-section">
+  <h5>Прогнать через стратегию</h5>
+  <div class="d-flex gap-2 flex-wrap">
+    <select id="stratSelect" class="form-select" style="max-width:300px;">
+      {% for s in strategies %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary-custom" onclick="runAnalysis()">
+      <i class="bi bi-play-fill me-1"></i>Анализировать
+    </button>
+  </div>
+  <div id="analysisResult" style="display:none;" class="mt-3"></div>
+</div>
+{% endif %}
+
+<div id="stockInfoSection" style="display:none;">
+  <div class="info-section"><h5>Цена и торговля</h5><div class="info-grid" id="priceGrid"></div></div>
+  <div class="info-section"><h5>Оценка компании</h5><div class="info-grid" id="valuationGrid"></div></div>
+  <div class="info-section"><h5>Финансы</h5><div class="info-grid" id="financialsGrid"></div></div>
+  <div class="info-section"><h5>Дивиденды и рентабельность</h5><div class="info-grid" id="dividendsGrid"></div></div>
+  <div class="info-section"><h5>Аналитика</h5><div class="info-grid" id="analystGrid"></div></div>
+  <div class="info-section" id="descSection" style="display:none;">
+    <h5>О компании</h5>
+    <p id="stockDesc" style="font-size:.9rem;line-height:1.7;"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const SYMBOL = '{{ symbol }}';
+const FASTAPI = 'http://localhost:8001';
+const CSRF = '{{ csrf_token }}';
+const ANALYZE_URL = '{% url "analysis_api_analyze_single" %}';
+
+// ── Состояние ────────────────────────────────────────────────────────────────
+let mainChart, mainSeries, smaSeries, emaSeries;
+let subCharts = {};
+let subSeries = {};
+let activeOverlays = {sma:false, ema:false};
+let activeSubs     = {rsi:false, macd:false, vol:false};
+let currentCandles = [];
+let currentTF      = '1d';   // текущий таймфрейм
+const INTRADAY_TF  = new Set(['5m','30m','1h','4h']);
+
+// ── Утилиты ──────────────────────────────────────────────────────────────────
+const infoItem = (label, value) =>
+  `<div class="info-item"><div class="label">${label}</div><div class="value">${value??'—'}</div></div>`;
+
+const spinner = (show, text='Загружаем данные…') => {
+  document.getElementById('spinnerText').textContent = text;
+  document.getElementById('spinner-overlay').classList.toggle('active', show);
+};
+
+const isDark = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+const textColor = () => isDark() ? '#94a3b8' : '#64748b';
+
+// ── Инициализация основного графика ──────────────────────────────────────────
+function initChart() {
+  const el = document.getElementById('main-chart');
+  const w  = el.parentElement.offsetWidth  || 800;
+  const h  = el.parentElement.offsetHeight || 500;
+  mainChart = LightweightCharts.createChart(el, {
+    width: w, height: h,
+    layout: { background:{type:'solid',color:'transparent'}, textColor: textColor() },
+    grid: { vertLines:{color:'rgba(128,128,128,.1)'}, horzLines:{color:'rgba(128,128,128,.1)'} },
+    timeScale: { borderColor:'rgba(128,128,128,.2)', timeVisible:true },
+    rightPriceScale: { borderColor:'rgba(128,128,128,.2)' },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  mainSeries = mainChart.addCandlestickSeries({
+    upColor:'#22c55e', downColor:'#ef4444', borderVisible:false,
+    wickUpColor:'#22c55e', wickDownColor:'#ef4444',
+  });
+  new ResizeObserver(es => { for(const e of es) mainChart.applyOptions({width:e.contentRect.width}); })
+    .observe(el.parentElement);
+}
+
+// ── Загрузка свечей ───────────────────────────────────────────────────────────
+async function loadCandles(tf) {
+  try {
+    const r = await fetch(`${FASTAPI}/chart-data/${SYMBOL}?tf=${tf}`);
+    const d = await r.json();
+    currentCandles = d.candles || [];
+    // Для интрадей Lightweight Charts требует timeVisible и секунды как число
+    mainChart.applyOptions({
+      timeScale: {
+        timeVisible: INTRADAY_TF.has(tf),
+        secondsVisible: false,
+        borderColor: 'rgba(128,128,128,.2)',
+      }
+    });
+    mainSeries.setData(currentCandles);
+    if (activeOverlays.sma) drawSMA();
+    if (activeOverlays.ema) drawEMA();
+    if (activeSubs.vol)  updateVolData(d.volume || []);
+    if (activeSubs.rsi)  updateRSI();
+    if (activeSubs.macd) updateMACD();
+    mainChart.timeScale().fitContent();
+  } catch(e) { console.error('loadCandles:', e); }
+}
+
+function changeTF(tf, btn) {
+  currentTF = tf;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadCandles(tf);
+}
+
+// ── Overlay: SMA / EMA ───────────────────────────────────────────────────────
+function calcSMA(data, n) {
+  return data.slice(n-1).map((_,i) => ({
+    time: data[i+n-1].time,
+    value: data.slice(i,i+n).reduce((s,c)=>s+c.close,0)/n,
+  }));
+}
+
+function calcEMA(data, n) {
+  const k = 2/(n+1); let ema = data[0]?.close || 0; const out = [];
+  data.forEach((d,i) => {
+    ema = i===0 ? d.close : d.close*k + ema*(1-k);
+    if (i >= n-1) out.push({time:d.time, value:+ema.toFixed(4)});
+  });
+  return out;
+}
+
+function toggleOverlay(type) {
+  activeOverlays[type] = !activeOverlays[type];
+  document.getElementById('btn-'+type).classList.toggle('active', activeOverlays[type]);
+  if (type==='sma') {
+    if (activeOverlays.sma) drawSMA();
+    else { smaSeries && mainChart.removeSeries(smaSeries); smaSeries=null; }
+  } else {
+    if (activeOverlays.ema) drawEMA();
+    else { emaSeries && mainChart.removeSeries(emaSeries); emaSeries=null; }
+  }
+}
+
+function drawSMA() {
+  if (!currentCandles.length) return;
+  if (!smaSeries) smaSeries = mainChart.addLineSeries({color:'#3b82f6',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
+  smaSeries.setData(calcSMA(currentCandles, 20));
+}
+
+function drawEMA() {
+  if (!currentCandles.length) return;
+  if (!emaSeries) emaSeries = mainChart.addLineSeries({color:'#f59e0b',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
+  emaSeries.setData(calcEMA(currentCandles, 50));
+}
+
+// ── Субграфики: создание ОДИН РАЗ ────────────────────────────────────────────
+function getOrCreateSubChart(id) {
+  if (subCharts[id]) return subCharts[id];  // уже есть — возвращаем
+  const wrap = document.createElement('div');
+  wrap.className = 'sub-chart-container'; wrap.id = 'sub-'+id;
+  document.getElementById('sub-charts').appendChild(wrap);
+  const c = LightweightCharts.createChart(wrap, {
+    width: wrap.offsetWidth || 800, height: 140,
+    layout: { background:{type:'solid',color:'transparent'}, textColor: textColor() },
+    grid: { vertLines:{color:'rgba(128,128,128,.08)'}, horzLines:{color:'rgba(128,128,128,.08)'} },
+    timeScale: { visible:false },
+    rightPriceScale: { borderColor:'rgba(128,128,128,.2)', scaleMargins:{top:.1,bottom:.1} },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  subCharts[id] = c;
+  new ResizeObserver(es => { for(const e of es) c.applyOptions({width:e.contentRect.width}); }).observe(wrap);
+  return c;
+}
+
+function removeSubChart(id) {
+  const el = document.getElementById('sub-'+id);
+  if (el) el.remove();
+  delete subCharts[id];
+  delete subSeries[id];
+}
+
+function toggleSub(type) {
+  activeSubs[type] = !activeSubs[type];
+  document.getElementById('btn-'+type).classList.toggle('active', activeSubs[type]);
+  if (!activeSubs[type]) { removeSubChart(type); return; }
+  if (type==='vol')  initVol();
+  if (type==='rsi')  initRSI();
+  if (type==='macd') initMACD();
+}
+
+// ── Volume ────────────────────────────────────────────────────────────────────
+function initVol() {
+  const c = getOrCreateSubChart('vol');
+  if (!subSeries.vol)
+    subSeries.vol = c.addHistogramSeries({priceFormat:{type:'volume'}});
+  fetch(`${FASTAPI}/chart-data/${SYMBOL}?tf=${currentTF}`)
+    .then(r=>r.json()).then(d=>{ subSeries.vol.setData(d.volume||[]); c.timeScale().fitContent(); });
+}
+
+function updateVolData(volData) {
+  if (!subSeries.vol) return;
+  subSeries.vol.setData(volData);
+  subCharts.vol?.timeScale().fitContent();
+}
+
+// ── RSI ───────────────────────────────────────────────────────────────────────
+function calcRSIData(n=14) {
+  const closes = currentCandles.map(d=>d.close); const out=[];
+  for(let i=n; i<closes.length; i++) {
+    let g=0,l=0;
+    for(let j=i-n+1;j<=i;j++){const d=closes[j]-closes[j-1]; d>0?g+=d:l-=d;}
+    out.push({time:currentCandles[i].time, value:+(100-100/(1+g/(l||.0001))).toFixed(2)});
+  }
+  return out;
+}
+
+function initRSI() {
+  const c = getOrCreateSubChart('rsi');
+  if (!subSeries.rsi) {
+    subSeries.rsi = {
+      main: c.addLineSeries({color:'#8b5cf6',lineWidth:1.5,priceLineVisible:false,lastValueVisible:true}),
+      ob:   c.addLineSeries({color:'rgba(239,68,68,.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false}),
+      os:   c.addLineSeries({color:'rgba(34,197,94,.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false}),
+    };
+  }
+  updateRSI();
+}
+
+function updateRSI() {
+  if (!subSeries.rsi || !currentCandles.length) return;
+  const n=14, rsiData=calcRSIData(n);
+  subSeries.rsi.main.setData(rsiData);
+  subSeries.rsi.ob.setData(currentCandles.slice(n).map(d=>({time:d.time,value:70})));
+  subSeries.rsi.os.setData(currentCandles.slice(n).map(d=>({time:d.time,value:30})));
+  subCharts.rsi?.timeScale().fitContent();
+}
+
+// ── MACD ──────────────────────────────────────────────────────────────────────
+function calcMACDData() {
+  const e12=calcEMA(currentCandles,12), e26=calcEMA(currentCandles,26);
+  const m26={}; e26.forEach(d=>m26[d.time]=d.value);
+  const ml=e12.filter(d=>m26[d.time]).map(d=>({time:d.time,value:+(d.value-m26[d.time]).toFixed(4)}));
+  const sig=calcEMA(ml.map(d=>({...d,close:d.value})),9);
+  const ms={}; sig.forEach(d=>ms[d.time]=d.value);
+  const hist=ml.filter(d=>ms[d.time]).map(d=>({
+    time:d.time, value:+(d.value-ms[d.time]).toFixed(4),
+    color: d.value-ms[d.time]>=0?'#22c55e':'#ef4444',
+  }));
+  return {ml, sig, hist};
+}
+
+function initMACD() {
+  const c = getOrCreateSubChart('macd');
+  if (!subSeries.macd) {
+    subSeries.macd = {
+      line:   c.addLineSeries({color:'#3b82f6',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false}),
+      signal: c.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false}),
+      hist:   c.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}),
+    };
+  }
+  updateMACD();
+}
+
+function updateMACD() {
+  if (!subSeries.macd || !currentCandles.length) return;
+  const {ml,sig,hist}=calcMACDData();
+  subSeries.macd.line.setData(ml);
+  subSeries.macd.signal.setData(sig);
+  subSeries.macd.hist.setData(hist);
+  subCharts.macd?.timeScale().fitContent();
+}
+
+// ── Информация об акции ───────────────────────────────────────────────────────
+async function loadStockInfo() {
+  try {
+    const r = await fetch(`${FASTAPI}/stock-info/${SYMBOL}`);
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({detail:'Ошибка'}));
+      document.getElementById('stockSector').textContent = '⚠ '+(err.detail||'Ошибка');
+      return;
+    }
+    const d = await r.json();
+    document.getElementById('stockName').textContent = d.name;
+    document.getElementById('stockSector').textContent = [d.sector,d.industry].filter(x=>x&&x!=='—').join(' · ');
+    document.getElementById('stockMeta').textContent   = [d.exchange,d.country,d.currency].filter(x=>x&&x!=='—').join(' · ');
+    if (d.price) {
+      document.getElementById('stockPrice').textContent     = `${d.price} ${d.currency}`;
+      document.getElementById('stockPriceInfo').textContent = `Пред. закрытие: ${d.previous_close} · Откр.: ${d.open}`;
+    }
+    document.getElementById('priceGrid').innerHTML = [
+      infoItem('Цена',`${d.price} ${d.currency}`), infoItem('Откр.',d.open),
+      infoItem('Мин. дня',d.day_low), infoItem('Макс. дня',d.day_high),
+      infoItem('52н мин',d.week_52_low), infoItem('52н макс',d.week_52_high),
+      infoItem('Объём',d.volume), infoItem('Ср. объём',d.avg_volume),
+    ].join('');
+    document.getElementById('valuationGrid').innerHTML = [
+      infoItem('Капитализация',d.market_cap), infoItem('Enterprise Value',d.enterprise_value),
+      infoItem('P/E (TTM)',d.pe_ratio), infoItem('P/E (форвард)',d.forward_pe),
+      infoItem('PEG',d.peg_ratio), infoItem('P/S',d.ps_ratio),
+      infoItem('P/B',d.pb_ratio), infoItem('EV/EBITDA',d.ev_ebitda),
+    ].join('');
+    document.getElementById('financialsGrid').innerHTML = [
+      infoItem('Выручка',d.revenue), infoItem('Вал. прибыль',d.gross_profit),
+      infoItem('EBITDA',d.ebitda), infoItem('Чист. прибыль',d.net_income),
+      infoItem('EPS',d.eps), infoItem('Рост выручки',d.revenue_growth),
+      infoItem('Рост прибыли',d.earnings_growth), infoItem('Долг',d.total_debt),
+      infoItem('Кэш',d.total_cash), infoItem('Долг/Капитал',d.debt_to_equity),
+      infoItem('Ликвидность',d.current_ratio),
+    ].join('');
+    document.getElementById('dividendsGrid').innerHTML = [
+      infoItem('Дивиденд',d.dividend_rate), infoItem('Дивид. доходность',d.dividend_yield),
+      infoItem('Коэф. выплат',d.payout_ratio), infoItem('Чист. маржа',d.profit_margin),
+      infoItem('Вал. маржа',d.gross_margin), infoItem('Опер. маржа',d.operating_margin),
+      infoItem('ROE',d.roe), infoItem('ROA',d.roa), infoItem('Beta',d.beta),
+    ].join('');
+    document.getElementById('analystGrid').innerHTML = [
+      infoItem('Рекомендация',d.recommendation), infoItem('Целевая цена',d.target_price),
+      infoItem('Аналитиков',d.analyst_count), infoItem('Акций в обр.',d.shares_outstanding),
+      infoItem('Доля инсайдеров',d.held_by_insiders), infoItem('Доля институтов',d.held_by_institutions),
+    ].join('');
+    if (d.description && d.description!=='—') {
+      document.getElementById('stockDesc').textContent = d.description;
+      document.getElementById('descSection').style.display = '';
+    }
+    document.getElementById('stockInfoSection').style.display = '';
+  } catch(e) {
+    document.getElementById('stockSector').textContent = '⚠ Не удалось загрузить данные';
+    console.error(e);
+  }
+}
+
+// ── Анализ стратегии ──────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const stratId = document.getElementById('stratSelect')?.value;
+  if (!stratId) return;
+  spinner(true,'Анализируем…');
+  try {
+    const r = await fetch(ANALYZE_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+      body: JSON.stringify({ticker:SYMBOL, strategy_id:parseInt(stratId)}),
+    });
+    const d = await r.json();
+    spinner(false);
+    if (!d.success) { alert(d.error||'Ошибка'); return; }
+    const detail  = (d.details||[])[0];
+    const matched = d.matched?.includes(SYMBOL);
+    let html = `<div class="strategy-result">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="fw-bold">Стратегия: ${d.strategy_name}</span>
+        <span class="${matched?'badge-ok':'badge-fail'}">${matched?'✓ Прошла':'✗ Не прошла'}</span>
+      </div>`;
+    (detail?.conditions||[]).forEach(c => {
+      html += `<div class="cond-row">
+        <span class="${c.passed?'badge-ok':'badge-fail'}">${c.passed?'✓':'✗'}</span>
+        <span class="fw-semibold" style="font-size:.85rem;">${c.label}</span>
+        <span class="text-muted ms-auto" style="font-size:.8rem;">${c.value??'—'} ${c.operator} ${c.threshold??c.compare_to??'—'}</span>
+      </div>`;
+    });
+    html += '</div>';
+    const el = document.getElementById('analysisResult');
+    el.innerHTML = html; el.style.display = '';
+  } catch(e) { spinner(false); alert('Ошибка соединения'); }
+}
+
+// ── Старт ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initChart();
+  spinner(true);
+  await Promise.all([loadCandles('1d'), loadStockInfo()]);
+  spinner(false);
+  activeSubs.vol = true;
+  document.getElementById('btn-vol').classList.add('active');
+  initVol();
+});
+</script>
+{% endblock %}

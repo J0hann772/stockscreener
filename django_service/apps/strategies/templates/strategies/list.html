@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 d-flex justify-content-between align-items-center mb-3">
+        <h3>Мои Стратегии</h3>
+        <a href="{% url 'strategy_create' %}" class="btn btn-primary">Создать новую</a>
+    </div>
+</div>
+
+<div class="row">
+    {% for strategy in strategies %}
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ strategy.name }} {% if not strategy.is_active %}<span class="badge bg-secondary">Отключена</span>{% endif %}</h5>
+                <p class="card-text text-muted">{{ strategy.description }}</p>
+                
+                <h6>Условия:</h6>
+                <ul>
+                    {% for condition in strategy.conditions.all %}
+                    <li><b>{{ condition.indicator }}</b> {{ condition.get_operator_display }} {{ condition.value }}</li>
+                    {% empty %}
+                    <li>Нет условий (всегда срабатывает)</li>
+                    {% endfor %}
+                </ul>
+                
+                <form action="{% url 'strategy_delete' strategy.id %}" method="post" onsubmit="return confirm('Точно удалить?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p>У вас пока нет стратегий.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
